@@ -1,0 +1,12 @@
+{
+  "name": "ship-eazy-contracts",
+  "version": "1.0.0",
+  "description": "ShipmentTracker smart contract + tests",
+  "scripts": {
+    "test": "npx hardhat test",
+    "deploy:local": "npx hardhat run scripts/deploy.js --network localhost",
+    "deploy:amoy": "npx hardhat run scripts/deploy.js --network polygonAmoy",
+    "seed:local": "npx hardhat run scripts/seed.js --network localhost",
+    "node": "npx hardhat node"
+  }
+}

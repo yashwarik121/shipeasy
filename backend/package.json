@@ -1,0 +1,10 @@
+{
+  "name": "ship-eazy-backend",
+  "version": "1.0.0",
+  "description": "Express API relay for ShipmentTracker",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js"
+  }
+}

@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+
+# Build outputs
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+frontend/dist/
+
+# SQLite database
+backend/*.db
+backend/*.sqlite
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Hardhat
+contracts/coverage/
+contracts/coverage.json
