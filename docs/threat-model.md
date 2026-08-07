@@ -1,5 +1,179 @@
 # Ship.Eazy — Threat Model
 
-<!-- TODO: Full threat analysis -->
-<!-- Mitigated: retroactive edits, role impersonation, stage-skipping -->
-<!-- NOT mitigated: physical truth, key loss, carrier onboarding trust -->
+This document provides a comprehensive security and threat model analysis for **Ship.Eazy**, an Ethereum/Polygon-based decentralized shipment tracking system developed as a final year engineering project. 
+
+The primary objective of this document is to evaluate the security guarantees, trust boundaries, attack surfaces, and design limitations of the application. It serves as an honest, defensible security audit tailored for academic viva defense, establishing clearly what security properties the decentralized architecture mathematically guarantees, and what real-world operational challenges remain out of scope for the base protocol.
+
+---
+
+## System Architecture Overview
+
+Ship.Eazy utilizes a decoupled, three-tier decentralized application (dApp) architecture designed to guarantee that state transitions remain strictly governed by smart contract logic rather than off-chain servers.
+
+```
++-----------------------------------------------------------------------------------+
+|                                 USER INTERFACE                                    |
+|                       Client Frontend (React / Web App)                           |
++--------------------------+---------------------------------+----------------------+
+                           |                                 |
+           Web3 Direct Write Calls                    HTTP Cached Read Queries
+         (MetaMask Signed Tx Sandbox)                (Non-Authoritative Relay)
+                           |                                 |
+                           v                                 v
++--------------------------+----------+    +-----------------+----------------------+
+|       DECENTRALIZED LAYER           |    |           CACHE / RELAY LAYER          |
+|  Polygon Amoy Testnet Blockchain    |    |   Off-Chain Backend (Express + SQLite) |
+|  - Smart Contract (ShipmentTracker) |    |   - Read-only indexed event cache    |
+|  - Stage Enum: Created -> PickedUp  |    |   - Zero private keys held           |
+|                -> InTransit ->      |    |   - Rebuildable from RPC logs        |
+|                Delivered            |    |                                        |
++-------------------------------------+    +----------------------------------------+
+```
+
+### The 3-Layer Architecture
+
+1. **Smart Contract Layer (`ShipmentTracker.sol`)**:
+   - Deployed on the **Polygon Amoy Testnet**.
+   - Serves as the single, immutable source of truth for all shipment state transitions.
+   - Encapsulates state progression across four distinct stages: `Created` (0) → `PickedUp` (1) → `InTransit` (2) → `Delivered` (3).
+   - Enforces role-based access control (RBAC) per stage using cryptographic wallet signatures (`msg.sender`).
+
+2. **Read-Only Cache Relay Layer (Express + SQLite Backend)**:
+   - Off-chain indexing service that listens to `ShipmentTracker` contract events and caches data in a local SQLite database for fast user UI querying.
+   - **Crucial Security Constraint**: The backend holds zero private keys, performs no write transactions to the blockchain, and possesses no administrative privileges over the smart contract. If the backend fails or is tampered with, the system's state remains untouched on-chain.
+
+3. **Client Frontend Layer (React / Web3 Interface)**:
+   - Interacts directly with the user's browser wallet (MetaMask) for state-changing operations.
+   - Submits raw transactions straight to the Polygon Amoy JSON-RPC endpoints via web3 providers (e.g., Ethers.js / Viem).
+   - Uses the Express backend solely as an optimized read-only lookup layer for display purposes.
+
+---
+
+## Threat Categories
+
+### Mitigated Threats
+
+The table below outlines threats that are fully mitigated by smart contract mechanics, EVM consensus runtime rules, and cryptographic primitives.
+
+| Threat | Attack Vector | Mitigation | Contract Mechanism |
+| :--- | :--- | :--- | :--- |
+| **1. Retroactive Record Tampering** | Malicious participant attempts to alter past shipment details, status timestamps, or role assignments to evade liability. | Blockchain Immutability: State storage on Polygon is secured by cryptographic hashes (Merkle Patricia Tries) and decentralized validator consensus. Past transactions cannot be overwritten or deleted. | State variables (`Shipment` struct stored in mapping) can only be updated via explicit state-advancing functions. No delete or retroactive overwrite functions exist in `ShipmentTracker.sol`. |
+| **2. Role Impersonation** | An unauthorized actor attempts to call status update functions claiming to be the designated Sender, Carrier, or Receiver. | Cryptographic Signatures: Transactions in Ethereum-compatible chains require ECDSA signatures generated by private keys known only to wallet owners. | Standard EVM runtime check `require(msg.sender == targetRole)` verifies the caller's verified address against the stored address in `shipment.sender`, `shipment.carrier`, or `shipment.receiver`. |
+| **3. Status Stage-Skipping** | An attacker or carrier attempts to bypass pipeline steps (e.g., jumping from `Created` directly to `Delivered` to bypass in-transit checks). | Monotonic Enum Arithmetic: The smart contract mandates strict, sequential zero-indexed transitions (`Created=0` → `PickedUp=1` → `InTransit=2` → `Delivered=3`). | Strict state guard validation check: `require(uint8(nextStatus) == uint8(currentStatus) + 1, "Invalid stage transition")`. |
+| **4. Unauthorized Status Advancement** | A carrier attempts to confirm delivery, or a receiver attempts to mark a package as picked up. | Stage-Specific Role Authorization: Each transition function evaluates caller authorization against the exact role required for that stage. | Stage mapping guards: `PickedUp` & `InTransit` enforce `require(msg.sender == shipment.carrier)`; `Delivered` enforces `require(msg.sender == shipment.receiver)`. |
+| **5. Single Point of Trust / Database Manipulation** | Malicious actor compromises the Express/SQLite backend server and modifies cached shipment records. | Decoupled Source of Truth: The SQLite database is purely an indexer. The frontend can fallback to querying Polygon RPC logs directly. Database corruption does not impact on-chain state. | No backend API write endpoints exist to alter contract state. All state writes bypass the backend entirely and pass directly from MetaMask to Polygon RPC. |
+| **6. Backend Bypass** | An attacker bypasses the frontend application and calls smart contract functions directly via Etherscan or direct RPC scripts. | On-Chain Business Rule Enforcement: All validation logic, role checks, and state transitions reside inside the smart contract code itself, not off-chain server scripts. | EVM code execution guarantees that direct contract calls are subjected to the exact same `require()` checks as frontend calls. |
+| **7. Event Log Tampering** | An adversary attempts to fake or manipulate historical transaction logs or status audit trails. | Transaction Receipt Integrity: Smart contract events (`ShipmentCreated`, `StatusUpdated`) are emitted directly into blockchain transaction receipts, incorporated into block headers. | `emit StatusUpdated(_shipmentId, newStatus, msg.sender, block.timestamp)` binds event logs permanently to mined blocks. |
+
+---
+
+### NOT Mitigated (Honest Limitations)
+
+The following vulnerabilities are inherently out-of-scope for application-layer smart contracts or represent systemic limitations of current Web3 infrastructure. Acknowledging these limitations is essential for an accurate security posture assessment.
+
+| Threat | Why It's Not Mitigated | Real-World Impact |
+| :--- | :--- | :--- |
+| **1. Physical Truth of Delivery (Oracle Problem)** | The blockchain records cryptographic transactions, not physical realities. A dishonest carrier can broadcast a `Delivered` transaction while keeping or dumping the package. | High. The smart contract guarantees that the *carrier's wallet* claimed delivery, but cannot prove *physical arrival* without trusted hardware or multi-party verification. |
+| **2. Private Key Compromise** | If an actor's private key (e.g., carrier's wallet seed phrase) is stolen or leaked, the attacker gains full capability to execute authorized actions. | Critical for compromised party. The contract cannot distinguish between an authorized user and an attacker using the user's valid private key signature. |
+| **3. Carrier/Receiver Onboarding Trust** | The sender specifies carrier and receiver Ethereum addresses upon creating the shipment. If the sender enters an incorrect or malicious address, the contract accepts it. | Moderate. Invalid address inputs can lead to permanently locked shipments ("Garbage In, Garbage Out"), requiring careful input validation at the UX layer. |
+| **4. Denial of Service by Role Holder** | A carrier can accept a shipment (`PickedUp`) and subsequently refuse to call `InTransit` or deliver the package, stalling the pipeline indefinitely. | High operational impact. The current contract lacks timeout recovery, fallback carriers, financial slashes/collateral, or escalation workflows. |
+| **5. Front-Running / MEV (Maximal Extractable Value)** | Transaction requests submitted to public mempools can be observed by validators or searchers before inclusion in a block. | Low risk in this specific context due to role checks, but state transition orders could theoretically be reordered by Polygon validators. |
+| **6. Immutable Contract Code Risk** | `ShipmentTracker.sol` is deployed without upgradeable proxy patterns. If logic flaws or vulnerabilities are identified post-deployment, the code cannot be patched. | Moderate. Any vulnerability requires redeploying a brand-new contract instance and migrating historical data off-chain. |
+| **7. Gas Cost & Network Dependency** | Every status update requires Polygon MATIC gas fees and depends on network availability. Network congestion or RPC provider outages halt updates. | Operational disruption. High congestion can cause transaction delays or failure if gas limits are set incorrectly by end users. |
+| **8. Lack of Data Privacy** | Smart contract state and emitted events are completely public on Polygon Amoy. Shipment IDs, wallet addresses, and status history are publicly readable. | High for commercial privacy. Competitors or unauthorized parties can inspect supply chain throughput and participant relationships on-chain. |
+
+---
+
+## Trust Boundaries Diagram
+
+The security architecture of Ship.Eazy relies on distinct trust boundaries separating client runtimes, key custody, RPC infrastructure, and the EVM state machine:
+
+```
+[ FRONTEND RUNTIME (Browser) ]
+              |
+====== TRUST BOUNDARY 1: Client Key Custody ======
+              | (Delegates transaction signing to browser wallet extension)
+              v
+[ METAMASK / USER WALLET ]
+              |
+====== TRUST BOUNDARY 2: RPC Data Transport ======
+              | (Transmits signed raw transaction payload over JSON-RPC)
+              v
+[ POLYGON AMOY RPC NODE / BLOCKCHAIN CONSENSUS ] <--- [ CONTRACT: Single Source of Truth ]
+              ^
+              | (Listens to WebSocket / Polls Log Events for Indexing)
+====== TRUST BOUNDARY 3: Passive Read Cache ======
+              |
+[ BACKEND CACHE RELAY (Express + SQLite) ]
+              ^
+              | (Non-authoritative convenience queries for UI display)
+====== TRUST BOUNDARY 4: Frontend View Layer ======
+              |
+[ FRONTEND READ DATA RENDERING ]
+```
+
+### Trust Boundary Analysis
+
+1. **Frontend ↔ MetaMask (Boundary 1)**:
+   - **Trust Relationship**: The frontend application does *not* possess user keys. It requests signatures from MetaMask via standard Web3 providers (`window.ethereum`).
+   - **Security Guarantee**: The user must explicitly inspect and confirm transaction parameters inside the MetaMask modal before any state change can occur.
+
+2. **MetaMask ↔ Blockchain RPC (Boundary 2)**:
+   - **Trust Relationship**: MetaMask relies on a JSON-RPC endpoint (e.g., Infura, Alchemy, or public Polygon RPC) to broadcast signed transactions and fetch contract state.
+   - **Security Guarantee**: Even if an RPC node acts maliciously, it *cannot fake signatures* or bypass contract execution rules. However, a compromised RPC node could delay transactions or present stale state data.
+
+3. **Backend ↔ Blockchain (Boundary 3)**:
+   - **Trust Relationship**: The backend indexer reads emitted event logs (`ShipmentCreated`, `StatusUpdated`) from the RPC node to populate its local SQLite database.
+   - **Security Guarantee**: The backend treats the blockchain as an authoritative read-only publisher. The backend cannot forge events because event logs are cryptographically tied to mined transaction receipts.
+
+4. **Frontend ↔ Backend (Boundary 4)**:
+   - **Trust Relationship**: The client web application queries the backend REST API strictly for fast search, filter, and aggregate views.
+   - **Security Guarantee**: This path is purely a convenience layer. If the backend returns tampered data, a user can verify the actual status directly on-chain via Polygonscan or direct RPC calls.
+
+> [!IMPORTANT]
+> **Key Architectural Insight**: The **only trust-critical security boundary** in the entire system lies between **MetaMask and the Blockchain Smart Contract**. All intermediate off-chain components (the Express server, SQLite database, and frontend UI) are non-authoritative convenience mechanisms. The core security and integrity of Ship.Eazy remain mathematically intact regardless of off-chain server state.
+
+---
+
+## What This System Proves vs. What It Doesn't
+
+To maintain scientific integrity during project defense, the explicit scope of cryptographic proof offered by Ship.Eazy must be clearly delineated:
+
+### What This System PROVES:
+* **Authenticity of Signatures**: Proves that a transaction was cryptographically authorized by the specific Ethereum wallet designated as the Sender, Carrier, or Receiver.
+* **Immutability of State History**: Proves that once a status update transaction is mined into a block on Polygon, the timestamp, caller address, and stage record cannot be altered or retroactively deleted.
+* **Strict Process Compliance**: Proves that the shipment status strictly followed the valid sequential flow (`Created` → `PickedUp` → `InTransit` → `Delivered`) without skipping mandatory stages.
+* **Decentralized Auditability**: Proves that any external auditor can independently verify the complete sequence of events using block explorers without relying on Ship.Eazy servers.
+
+### What This System DOES NOT PROVE:
+* **Physical Truth of Events**: Does *not* prove that physical goods were actually packed, loaded, moved, or delivered. It only proves that an authorized wallet holder submitted a claim on-chain.
+* **Real-World Identity**: Does *not* prove the real-world human identity behind a wallet address (e.g., address `0x123...` belongs to John Doe), only that the private key matching `0x123...` signed the payload.
+* **Cargo Integrity / Condition**: Does *not* prove that shipment items were delivered undamaged, untampered, or within temperature limits during transport.
+* **Non-Repudiation of Off-Chain Goods**: Does *not* prevent a malicious carrier from marking a shipment as `Delivered` while stealing the contents off-chain.
+
+---
+
+## Recommendations for Production Deployment
+
+For Ship.Eazy to transition from an engineering prototype to an enterprise-grade production platform, the following architectural enhancements are strongly recommended:
+
+1. **Multi-Signature Authorization & Escrow**:
+   - Integrate multi-signature protocols (e.g., Safe / Gnosis Safe) requiring both Carrier and Receiver signatures—or a trusted third-party arbiter—to confirm final state settlement and release held escrow funds.
+
+2. **On-Chain Dispute Resolution & Penalty Mechanisms**:
+   - Implement time-lock constraints, financial collateral bonding for carriers, and automated dispute resolution workflows to mitigate Denial of Service (DoS) scenarios where a role holder stalls progress.
+
+3. **IoT Sensor & Oracle Integration (Chainlink)**:
+   - Connect physical IoT hardware (GPS tracking, tamper-evident seals, temperature sensors) via decentralized oracle networks like Chainlink to trigger status updates based on verifiable physical telemetry rather than manual wallet signatures.
+
+4. **Enterprise Key Management Infrastructure**:
+   - Support account abstraction (ERC-4337), social recovery wallets, hardware security modules (HSMs), or WebAuthn/Passkeys to prevent single-point-of-failure risks associated with lost or stolen private keys.
+
+5. **Upgradeable Contract Architecture**:
+   - Adopt standard proxy patterns (e.g., UUPS or Transparent Proxy Pattern via OpenZeppelin) to allow protocol bug fixes and feature enhancements while retaining underlying state data.
+
+6. **Privacy-Preserving Data Encryption**:
+   - Implement zero-knowledge proofs (zk-SNARKs) or asymmetric payload encryption (e.g., ECIES) so sensitive shipment metadata (item descriptions, physical addresses, commercial values) remains confidential on the public ledger.
+
+7. **Backend API Rate Limiting & Resilience**:
+   - Deploy robust rate-limiting middleware (e.g., `express-rate-limit`), CORS security headers (Helmet), and redundant RPC provider failover setups to harden the off-chain cache layer against DDoS attacks.
