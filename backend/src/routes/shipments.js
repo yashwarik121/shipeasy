@@ -22,7 +22,7 @@ router.get('/shipments', async (req, res) => {
     
     if (shipments.length === 0 && blockchain.contract) {
       const count = await blockchain.getShipmentCount();
-      for (let i = 1; i <= count; i++) {
+      for (let i = 0; i < count; i++) {
         const shipment = await blockchain.getShipment(i);
         const history = await blockchain.getHistory(i);
         cache.syncShipmentFromChain(i, shipment, history);

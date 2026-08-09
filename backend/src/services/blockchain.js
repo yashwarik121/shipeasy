@@ -60,30 +60,42 @@ class BlockchainService {
   async listenForEvents(callback) {
     if (!this.contract) return;
     
-    this.contract.on("ShipmentCreated", async (id, sender, receiver, carrier, description, event) => {
-      const block = await event.log.getBlock();
-      callback({
-        eventType: "ShipmentCreated",
-        shipmentId: Number(id),
-        status: 0, 
-        actor: sender,
-        timestamp: block.timestamp,
-        txHash: event.log.transactionHash,
-        blockNumber: event.log.blockNumber
-      });
+    this.contract.on("ShipmentCreated", async (...args) => {
+      try {
+        const event = args[args.length - 1]; // ContractEventPayload is always last
+        const log = event.log;
+        const block = await log.getBlock();
+        callback({
+          eventType: "ShipmentCreated",
+          shipmentId: Number(args[0]),
+          status: 0,
+          actor: String(args[1]),
+          timestamp: Number(block.timestamp),
+          txHash: log.transactionHash,
+          blockNumber: log.blockNumber
+        });
+      } catch (err) {
+        console.error("Error handling ShipmentCreated event:", err.message);
+      }
     });
 
-    this.contract.on("StatusUpdated", async (id, status, updater, event) => {
-      const block = await event.log.getBlock();
-      callback({
-        eventType: "StatusUpdated",
-        shipmentId: Number(id),
-        status: Number(status),
-        actor: updater,
-        timestamp: block.timestamp,
-        txHash: event.log.transactionHash,
-        blockNumber: event.log.blockNumber
-      });
+    this.contract.on("StatusUpdated", async (...args) => {
+      try {
+        const event = args[args.length - 1]; // ContractEventPayload is always last
+        const log = event.log;
+        const block = await log.getBlock();
+        callback({
+          eventType: "StatusUpdated",
+          shipmentId: Number(args[0]),
+          status: Number(args[1]),
+          actor: String(args[2]),
+          timestamp: Number(block.timestamp),
+          txHash: log.transactionHash,
+          blockNumber: log.blockNumber
+        });
+      } catch (err) {
+        console.error("Error handling StatusUpdated event:", err.message);
+      }
     });
   }
 }

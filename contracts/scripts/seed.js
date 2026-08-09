@@ -1,12 +1,21 @@
 const { ethers } = require("hardhat");
+const fs = require("fs");
+const path = require("path");
 
 async function main() {
   const [sender, carrier, receiver] = await ethers.getSigners();
-  const ShipmentTracker = await ethers.getContractFactory("ShipmentTracker");
-  const shipmentTracker = await ShipmentTracker.deploy();
-  await shipmentTracker.waitForDeployment();
+
+  // Read deployed contract address
+  const deployedPath = path.join(__dirname, "../deployed-address.json");
+  if (!fs.existsSync(deployedPath)) {
+    console.error("No deployed-address.json found. Run deploy.js first.");
+    process.exit(1);
+  }
+  const { address } = JSON.parse(fs.readFileSync(deployedPath, "utf-8"));
+  const shipmentTracker = await ethers.getContractAt("ShipmentTracker", address);
 
   console.log("Seeding data with accounts:");
+  console.log("Contract:", address);
   console.log("Sender:", sender.address);
   console.log("Carrier:", carrier.address);
   console.log("Receiver:", receiver.address);
