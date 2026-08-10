@@ -33,6 +33,28 @@ export const getStatusColor = (status) => {
   }
 };
 
+export const getStatusText = (status) => {
+  switch (Number(status)) {
+    case 0: return 'CREATED';
+    case 1: return 'PICKED UP';
+    case 2: return 'IN TRANSIT';
+    case 3: return 'DELIVERED';
+    default: return 'CREATED';
+  }
+};
+
+export const formatSequenceNumber = (num) => {
+  if (num === undefined || num === null) return '';
+  return String(num).padStart(3, '0');
+};
+
+export const copyToClipboard = (text) => {
+  if (!navigator.clipboard) {
+    return Promise.reject('Clipboard not supported');
+  }
+  return navigator.clipboard.writeText(text);
+};
+
 export const getExplorerTxUrl = (txHash) => {
   if (!txHash) return '#';
   return `${EXPLORER_URL}/tx/${txHash}`;

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { BrowserProvider } from 'ethers';
 
 const WalletContext = createContext();
@@ -12,6 +12,13 @@ export const WalletProvider = ({ children }) => {
   const [error, setError] = useState(null);
 
   const isCorrectChain = chainId === 80002n || chainId === 31337n;
+
+  const networkName = useMemo(() => {
+    if (chainId === 80002n) return 'Polygon Amoy';
+    if (chainId === 31337n) return 'Hardhat Local';
+    if (chainId) return `Unknown (${chainId})`;
+    return 'Unknown';
+  }, [chainId]);
 
   const updateWalletState = useCallback(async (accounts) => {
     if (accounts.length > 0) {
@@ -59,6 +66,42 @@ export const WalletProvider = ({ children }) => {
     setError(null);
   };
 
+  const switchToCorrectChain = async () => {
+    if (!window.ethereum) return;
+    try {
+      // Try to switch to Polygon Amoy
+      await window.ethereum.request({
+        method: 'wallet_switchEthereumChain',
+        params: [{ chainId: '0x13882' }],
+      });
+    } catch (switchError) {
+      if (switchError.code === 4902) {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [
+              {
+                chainId: '0x13882',
+                chainName: 'Polygon Amoy',
+                rpcUrls: ['https://rpc-amoy.polygon.technology'],
+                nativeCurrency: {
+                  name: 'MATIC',
+                  symbol: 'MATIC',
+                  decimals: 18,
+                },
+                blockExplorerUrls: ['https://amoy.polygonscan.com/'],
+              },
+            ],
+          });
+        } catch (addError) {
+          setError(addError.message);
+        }
+      } else {
+        setError(switchError.message);
+      }
+    }
+  };
+
   useEffect(() => {
     const checkIfConnected = async () => {
       if (window.ethereum) {
@@ -103,8 +146,10 @@ export const WalletProvider = ({ children }) => {
         chainId,
         isConnected,
         isCorrectChain,
+        networkName,
         connectWallet,
         disconnectWallet,
+        switchToCorrectChain,
         error
       }}
     >

@@ -2,49 +2,65 @@ import React from 'react';
 import { useWallet } from '../../context/WalletContext';
 
 const ConnectWallet = () => {
-  const { address, isConnected, connect, disconnect, isCorrectNetwork, isMetaMaskInstalled, networkName } = useWallet();
+  const { account, chainId, connect, disconnect, isCorrectNetwork, switchNetwork } = useWallet();
 
-  if (!isMetaMaskInstalled) {
+  const handleCopy = () => {
+    if (account) {
+      navigator.clipboard.writeText(account);
+    }
+  };
+
+  const formatAddress = (addr) => {
+    return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
+  };
+
+  if (!account) {
+    if (!window.ethereum) {
+      return (
+        <a 
+          href="https://metamask.io" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-sm font-mono text-ink"
+          style={{ textDecoration: 'underline' }}
+        >
+          INSTALL METAMASK
+        </a>
+      );
+    }
+
     return (
-      <a href="https://metamask.io" target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ textDecoration: 'none' }}>
-        Install MetaMask
-      </a>
+      <button onClick={connect} className="btn-connect">
+        CONNECT WALLET
+      </button>
     );
   }
 
-  if (isConnected && !isCorrectNetwork) {
+  if (!isCorrectNetwork) {
     return (
-      <div style={{ color: '#f59e0b', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ width: '8px', height: '8px', backgroundColor: '#f59e0b', display: 'inline-block' }}></span>
-        Wrong Network ({networkName || 'Polygon'})
-      </div>
-    );
-  }
-
-  if (isConnected) {
-    return (
-      <div 
-        onClick={disconnect}
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: '8px',
-          cursor: 'pointer',
-          padding: '8px 16px',
-          border: '1px solid var(--border-subtle, #333)',
-          backgroundColor: 'var(--bg-surface, #0a0a0b)'
-        }}
-      >
-        <span style={{ width: '8px', height: '8px', backgroundColor: 'var(--accent-green, #00d474)', borderRadius: '50%' }}></span>
-        <span className="chain-address">{address.substring(0, 6)}...{address.substring(address.length - 4)}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <span className="text-red font-mono font-bold">WRONG NETWORK</span>
+        <button onClick={switchNetwork} className="btn btn-danger" style={{ padding: '8px 16px', fontSize: '12px' }}>
+          SWITCH NETWORK
+        </button>
       </div>
     );
   }
 
   return (
-    <button onClick={connect} className="btn btn-primary">
-      Connect Wallet
-    </button>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+      <span 
+        className="chain-address copy-trigger" 
+        onClick={handleCopy}
+        title="Click to copy"
+        style={{ cursor: 'pointer', borderBottom: '1px dashed var(--ink)' }}
+      >
+        {formatAddress(account)}
+      </span>
+      <span className="text-steel text-xs font-mono">
+        POLYGON AMOY
+      </span>
+    </div>
   );
 };
 

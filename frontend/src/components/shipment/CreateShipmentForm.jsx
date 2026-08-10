@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useContract } from '../../hooks/useContract';
 import { useWallet } from '../../context/WalletContext';
-import { getExplorerTxUrl } from '../../utils/format';
+import { useContract } from '../../hooks/useContract';
 
 const CreateShipmentForm = () => {
   const [carrier, setCarrier] = useState('');
@@ -10,31 +9,27 @@ const CreateShipmentForm = () => {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [txHash, setTxHash] = useState('');
-
-  const { createShipment } = useContract();
-  const { isConnected } = useWallet();
+  const [success, setSuccess] = useState(null);
+  
+  const { account } = useWallet();
+  const contract = useContract();
   const navigate = useNavigate();
 
-  const isValidAddress = (addr) => /^0x[a-fA-F0-9]{40}$/.test(addr);
+  const validateAddress = (addr) => {
+    return /^0x[a-fA-F0-9]{40}$/.test(addr);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setTxHash('');
-
-    if (!isConnected) {
-      setError('Please connect your wallet first.');
+    
+    if (!validateAddress(carrier)) {
+      setError('Invalid carrier address. Must be 0x followed by 40 hex characters.');
       return;
     }
-
-    if (!isValidAddress(carrier)) {
-      setError('Invalid carrier address format.');
-      return;
-    }
-
-    if (!isValidAddress(receiver)) {
-      setError('Invalid receiver address format.');
+    
+    if (!validateAddress(receiver)) {
+      setError('Invalid receiver address. Must be 0x followed by 40 hex characters.');
       return;
     }
 
@@ -43,83 +38,129 @@ const CreateShipmentForm = () => {
       return;
     }
 
+    setLoading(true);
+
     try {
-      setLoading(true);
-      const hash = await createShipment(carrier, receiver, description);
-      setTxHash(hash);
+      const tx = await contract.createShipment(carrier, receiver, description);
       
-      // Wait a moment before redirecting
+      // Wait for confirmation
+      const receipt = await tx.wait();
+      
+      // Get shipment ID from event
+      const event = receipt.events?.find(e => e.event === 'ShipmentCreated');
+      const shipmentId = event ? event.args.shipmentId.toString() : null;
+
+      setSuccess({
+        blockNumber: receipt.blockNumber,
+        txHash: receipt.transactionHash,
+        shipmentId: shipmentId
+      });
+
       setTimeout(() => {
-        navigate('/'); 
-      }, 3000);
+        if (shipmentId) {
+          navigate(`/shipment/${shipmentId}`);
+        } else {
+          navigate('/dashboard');
+        }
+      }, 2000);
+      
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Transaction failed');
-    } finally {
+      setError(err.reason || err.message || 'Transaction failed');
       setLoading(false);
     }
   };
 
   return (
-    <div className="card" style={{ maxWidth: '600px', margin: '0 auto', padding: '24px' }}>
-      <h2 style={{ marginBottom: '8px' }}>New Shipment</h2>
-      <p className="text-secondary" style={{ marginBottom: '24px' }}>Your connected wallet will be the sender</p>
-
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div>
-          <label className="label" style={{ display: 'block', marginBottom: '8px' }}>Carrier Address</label>
-          <input 
-            type="text" 
-            value={carrier} 
-            onChange={(e) => setCarrier(e.target.value)} 
-            placeholder="0x..." 
-            className="chain-address"
-            style={{ width: '100%', padding: '12px', backgroundColor: 'transparent', border: '1px solid var(--border-subtle, #333)', color: 'var(--text-primary, #fff)' }}
-            disabled={loading}
-          />
+    <div style={{ maxWidth: '600px', border: '3px solid var(--ink)', padding: '32px' }}>
+      <h2 className="display-md uppercase mb-4" style={{ margin: '0 0 24px 0' }}>INITIATE CUSTODY TRANSFER</h2>
+      
+      {error && (
+        <div className="text-red font-mono mb-4" style={{ padding: '16px', border: '2px solid var(--seal-red)', background: 'rgba(184, 51, 47, 0.1)' }}>
+          [ERROR] {error}
         </div>
+      )}
 
-        <div>
-          <label className="label" style={{ display: 'block', marginBottom: '8px' }}>Receiver Address</label>
-          <input 
-            type="text" 
-            value={receiver} 
-            onChange={(e) => setReceiver(e.target.value)} 
-            placeholder="0x..." 
-            className="chain-address"
-            style={{ width: '100%', padding: '12px', backgroundColor: 'transparent', border: '1px solid var(--border-subtle, #333)', color: 'var(--text-primary, #fff)' }}
-            disabled={loading}
-          />
-        </div>
-
-        <div>
-          <label className="label" style={{ display: 'block', marginBottom: '8px' }}>Description</label>
-          <textarea 
-            value={description} 
-            onChange={(e) => setDescription(e.target.value)} 
-            placeholder="e.g., Electronics from Warehouse A to B" 
-            style={{ width: '100%', padding: '12px', backgroundColor: 'transparent', border: '1px solid var(--border-subtle, #333)', color: 'var(--text-primary, #fff)', minHeight: '100px', resize: 'vertical' }}
-            disabled={loading}
-          />
-        </div>
-
-        {error && <div style={{ color: 'var(--accent-red, #ff3333)', marginTop: '8px', fontSize: '0.875rem' }}>{error}</div>}
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
-        {txHash && (
-          <div style={{ marginTop: '8px', fontSize: '0.875rem' }}>
-            <span className="text-muted">Transaction sent: </span>
-            <a href={getExplorerTxUrl(txHash)} target="_blank" rel="noopener noreferrer" className="chain-hash">{txHash}</a>
-          </div>
-        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label className="section-label">CARRIER ADDRESS</label>
+          <input 
+            type="text" 
+            value={carrier}
+            onChange={(e) => setCarrier(e.target.value)}
+            className="font-mono"
+            placeholder="0x..."
+            style={{ 
+              padding: '12px', 
+              border: '2px solid var(--ink)', 
+              background: 'transparent', 
+              color: 'var(--ink)',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+            disabled={loading || success}
+          />
+        </div>
 
-        <button 
-          type="submit" 
-          className="btn btn-primary" 
-          disabled={loading}
-          style={{ marginTop: '16px' }}
-        >
-          {loading ? 'Creating...' : 'Create Shipment'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label className="section-label">RECEIVER ADDRESS</label>
+          <input 
+            type="text" 
+            value={receiver}
+            onChange={(e) => setReceiver(e.target.value)}
+            className="font-mono"
+            placeholder="0x..."
+            style={{ 
+              padding: '12px', 
+              border: '2px solid var(--ink)', 
+              background: 'transparent', 
+              color: 'var(--ink)',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+            disabled={loading || success}
+          />
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label className="section-label">SHIPMENT DESCRIPTION</label>
+          <textarea 
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={3}
+            style={{ 
+              padding: '12px', 
+              border: '2px solid var(--ink)', 
+              background: 'transparent', 
+              color: 'var(--ink)',
+              fontFamily: '"Inter", sans-serif',
+              resize: 'vertical',
+              width: '100%',
+              boxSizing: 'border-box'
+            }}
+            disabled={loading || success}
+          />
+        </div>
+
+        <div style={{ marginTop: '16px', border: success ? '2px solid var(--verified-green)' : 'none', position: 'relative' }} className={success ? 'animate-stamp-flash' : ''}>
+          {!success ? (
+            <button 
+              type="submit" 
+              className="btn btn-primary"
+              style={{ width: '100%', padding: '16px', fontSize: '16px' }}
+              disabled={loading || !account}
+            >
+              {loading ? 'AWAITING CONFIRMATION...' : 'SUBMIT TO CHAIN'}
+            </button>
+          ) : (
+            <div className="stamp animate-stamp" style={{ border: '2px solid var(--verified-green)', padding: '16px', textAlign: 'center' }}>
+              <div className="text-green font-mono font-bold mb-2">CONFIRMED ON-CHAIN</div>
+              <div className="text-green font-mono text-xs">BLOCK #{success.blockNumber}</div>
+              <div className="text-green font-mono text-xs">TX: {success.txHash.substring(0, 16)}...</div>
+            </div>
+          )}
+        </div>
       </form>
     </div>
   );

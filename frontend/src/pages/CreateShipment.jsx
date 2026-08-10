@@ -4,16 +4,17 @@ import CreateShipmentForm from '../components/shipment/CreateShipmentForm';
 
 const CreateShipment = () => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'flex', gap: '8px', fontSize: '0.875rem' }}>
-        <Link to="/" style={{ color: 'var(--text-secondary, #a1a1aa)', textDecoration: 'none' }}>Dashboard</Link>
-        <span className="text-muted">{'>'}</span>
-        <span style={{ color: 'var(--text-primary, #fff)' }}>Create Shipment</span>
-      </div>
+    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
       
-      <div style={{ marginTop: '16px' }}>
-        <CreateShipmentForm />
+      {/* Breadcrumb */}
+      <div className="font-mono text-sm mb-4" style={{ color: 'var(--steel)' }}>
+        <Link to="/dashboard" style={{ color: 'var(--ink)', textDecoration: 'none' }}>DASHBOARD</Link>
+        {' > '}
+        <span>NEW CUSTODY TRANSFER</span>
       </div>
+
+      <CreateShipmentForm />
+
     </div>
   );
 };

@@ -5,44 +5,70 @@ import ConnectWallet from '../wallet/ConnectWallet';
 const Header = () => {
   const location = useLocation();
 
+  const isActive = (path) => location.pathname === path;
+
   return (
-    <header className="flex-between" style={{
-      backgroundColor: 'var(--bg-surface, #0a0a0b)',
-      borderBottom: '1px solid var(--border-subtle, #333)',
-      height: '64px',
-      padding: '0 24px',
-      position: 'sticky',
-      top: 0,
-      zIndex: 100
+    <header style={{
+      background: 'var(--paper)',
+      borderBottom: '3px solid var(--ink)',
+      padding: '16px 24px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
     }}>
-      <div className="logo">
-        <Link to="/" style={{ textDecoration: 'none' }}>
-          <span style={{ color: 'var(--text-primary, #fff)', fontWeight: 700, fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)' }}>Ship</span>
-          <span style={{ color: 'var(--accent-green, #00d474)', fontWeight: 700, fontFamily: 'var(--font-mono, "JetBrains Mono", monospace)' }}>.Eazy</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+        <Link to="/" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
+          <span className="display-md uppercase" style={{ margin: 0, letterSpacing: '-0.02em' }}>
+            SHIP.EAZY
+          </span>
         </Link>
+        
+        <nav style={{ display: 'flex', gap: '24px' }}>
+          <Link 
+            to="/dashboard" 
+            style={{ 
+              textDecoration: 'none', 
+              color: 'var(--ink)',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              borderBottom: isActive('/dashboard') ? '3px solid var(--ink)' : '3px solid transparent',
+              paddingBottom: '4px'
+            }}
+          >
+            DASHBOARD
+          </Link>
+          <Link 
+            to="/create" 
+            style={{ 
+              textDecoration: 'none', 
+              color: 'var(--ink)',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              borderBottom: isActive('/create') ? '3px solid var(--ink)' : '3px solid transparent',
+              paddingBottom: '4px'
+            }}
+          >
+            NEW TRANSFER
+          </Link>
+          <Link 
+            to="/verify" 
+            style={{ 
+              textDecoration: 'none', 
+              color: 'var(--ink)',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              borderBottom: isActive('/verify') ? '3px solid var(--ink)' : '3px solid transparent',
+              paddingBottom: '4px'
+            }}
+          >
+            VERIFY
+          </Link>
+        </nav>
       </div>
-      <nav style={{ display: 'flex', gap: '24px' }}>
-        <Link 
-          to="/" 
-          style={{ 
-            color: location.pathname === '/' ? 'var(--accent-green, #00d474)' : 'var(--text-primary, #fff)', 
-            textDecoration: 'none',
-            fontWeight: 500
-          }}
-        >
-          Dashboard
-        </Link>
-        <Link 
-          to="/create" 
-          style={{ 
-            color: location.pathname === '/create' ? 'var(--accent-green, #00d474)' : 'var(--text-primary, #fff)', 
-            textDecoration: 'none',
-            fontWeight: 500
-          }}
-        >
-          Create Shipment
-        </Link>
-      </nav>
+
       <div>
         <ConnectWallet />
       </div>

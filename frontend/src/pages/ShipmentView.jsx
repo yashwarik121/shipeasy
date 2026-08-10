@@ -5,78 +5,57 @@ import ShipmentDetail from '../components/shipment/ShipmentDetail';
 
 const ShipmentView = () => {
   const { id } = useParams();
-  const { getShipment, getShipmentHistory } = useContract();
-  
+  const contract = useContract();
   const [shipment, setShipment] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    let intervalId;
+    let interval;
 
     const fetchData = async () => {
       try {
-        const shipmentData = await getShipment(id);
-        const historyData = await getShipmentHistory(id);
-        
-        setShipment(shipmentData);
-        setHistory(historyData);
+        if (!contract) return;
+        const s = await contract.getShipment(id);
+        const h = await contract.getShipmentHistory(id);
+        setShipment(s);
+        setHistory(h);
         setError('');
       } catch (err) {
-        console.error('Error fetching shipment:', err);
-        if (!shipment) {
-          setError('Shipment not found or error loading data.');
-        }
-      } finally {
-        setLoading(false);
+        console.error(err);
+        setError('RECORD NOT FOUND');
       }
+      setLoading(false);
     };
 
     fetchData();
 
-    // Auto-refresh every 10 seconds
-    intervalId = setInterval(() => {
+    interval = setInterval(() => {
       fetchData();
-    }, 10000);
+    }, 10000); // auto-refresh every 10 seconds
 
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
-  }, [id, getShipment, getShipmentHistory]);
-
-  if (loading && !shipment) {
-    return (
-      <div style={{ padding: '48px 0', textAlign: 'center' }}>
-        <p className="text-secondary">Loading shipment #{id}...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div style={{ padding: '48px 0', textAlign: 'center' }}>
-        <p style={{ color: 'var(--accent-red, #ff3333)' }}>{error}</p>
-        <Link to="/" className="btn btn-secondary" style={{ marginTop: '16px', display: 'inline-block', textDecoration: 'none' }}>
-          Back to Dashboard
-        </Link>
-      </div>
-    );
-  }
-
-  if (!shipment) return null;
+    return () => clearInterval(interval);
+  }, [contract, id]);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div style={{ display: 'flex', gap: '8px', fontSize: '0.875rem' }}>
-        <Link to="/" style={{ color: 'var(--text-secondary, #a1a1aa)', textDecoration: 'none' }}>Dashboard</Link>
-        <span className="text-muted">{'>'}</span>
-        <span style={{ color: 'var(--text-primary, #fff)' }}>Shipment <span className="chain-data">#{id}</span></span>
+    <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
+      {/* Breadcrumb */}
+      <div className="font-mono text-sm mb-4" style={{ color: 'var(--steel)' }}>
+        <Link to="/dashboard" style={{ color: 'var(--ink)', textDecoration: 'none' }}>DASHBOARD</Link>
+        {' > '}
+        <span>SHIPMENT #{id.padStart(3, '0')}</span>
       </div>
-      
-      <div style={{ marginTop: '8px' }}>
+
+      {loading ? (
+        <div className="font-mono text-ink text-center mt-4">RETRIEVING CUSTODY RECORD...</div>
+      ) : error ? (
+        <div className="font-mono text-red text-center mt-4" style={{ padding: '32px', border: '3px solid var(--seal-red)' }}>
+          {error}
+        </div>
+      ) : (
         <ShipmentDetail shipment={shipment} history={history} />
-      </div>
+      )}
     </div>
   );
 };

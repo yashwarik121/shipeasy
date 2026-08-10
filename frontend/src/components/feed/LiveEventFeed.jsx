@@ -1,55 +1,45 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { useEvents } from '../../hooks/useEvents';
-import { truncateAddress, truncateHash, timeAgo, getExplorerTxUrl } from '../../utils/format';
-import { STATUS_LABELS } from '../../utils/contract';
+import { formatTimestamp, getStatusColor, getStatusText, truncateHash } from '../../utils/format';
+import { Link } from 'react-router-dom';
 
 const LiveEventFeed = () => {
-  const { events } = useEvents();
-
-  const statusClassMap = ['status-created', 'status-pickedup', 'status-intransit', 'status-delivered'];
+  const events = useEvents();
 
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '100%', maxHeight: '800px', overflow: 'hidden' }}>
-      <div style={{ padding: '16px', borderBottom: '1px solid var(--border-subtle, #333)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <h3 style={{ margin: 0, fontSize: '1.125rem' }}>Live Feed</h3>
-        <div className="animate-confirm" style={{ width: '8px', height: '8px', backgroundColor: 'var(--accent-green, #00d474)', borderRadius: '50%' }} />
-      </div>
-
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+    <div style={{ border: '2px solid var(--ink)', padding: '16px', backgroundColor: 'var(--paper)' }}>
+      <h3 className="section-label mb-4" style={{ borderBottom: '2px solid var(--ink)', paddingBottom: '8px' }}>
+        LIVE CHAIN EVENTS
+      </h3>
+      
+      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
         {events && events.length > 0 ? (
-          events.map((event, index) => {
-            const isCreation = event.type === 'ShipmentCreated';
-            const statusLabel = STATUS_LABELS[event.status] || 'Unknown';
-            const statusClass = statusClassMap[event.status] || 'status-created';
-
-            return (
-              <div key={event.txHash + index} className="card animate-slide-in" style={{ padding: '12px', border: '1px solid var(--border-subtle, #333)', backgroundColor: 'transparent' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary, #fff)' }}>
-                    {isCreation ? 'Shipment Created' : 'Status Updated'}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {events.map((evt, idx) => {
+              const statusColor = getStatusColor(evt.status);
+              return (
+                <div key={idx} style={{ padding: '8px 0', borderBottom: '1px solid var(--steel)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                    <span className="chain-timestamp text-xs">{formatTimestamp(evt.timestamp)}</span>
+                    <span className="font-mono text-xs font-bold uppercase">{evt.eventName}</span>
                   </div>
-                  <span className="text-muted" style={{ fontSize: '0.75rem' }}>{timeAgo(event.timestamp)}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Link to={`/shipment/${evt.shipmentId}`} className="font-mono text-sm" style={{ color: 'var(--ink)', textDecoration: 'underline' }}>
+                      SHIPMENT #{evt.shipmentId.toString()}
+                    </Link>
+                    <span className={`status-text ${statusColor} text-xs`}>{getStatusText(evt.status)}</span>
+                  </div>
+                  <div className="mt-1">
+                    <span className="chain-hash text-xs text-steel">TX: {truncateHash(evt.transactionHash)}</span>
+                  </div>
                 </div>
-                
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <Link to={`/shipment/${event.shipmentId}`} className="chain-data" style={{ textDecoration: 'none', color: 'inherit' }}>
-                    #{event.shipmentId}
-                  </Link>
-                  <span className={`status-badge ${statusClass}`} style={{ fontSize: '0.7rem', padding: '2px 6px' }}>{statusLabel}</span>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
-                  <span className="chain-address" title={event.triggerAddress}>{truncateAddress(event.triggerAddress)}</span>
-                  <a href={getExplorerTxUrl(event.txHash)} target="_blank" rel="noopener noreferrer" className="chain-hash">
-                    {truncateHash(event.txHash)}
-                  </a>
-                </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         ) : (
-          <p className="text-muted" style={{ textAlign: 'center', marginTop: '32px' }}>Waiting for on-chain events...</p>
+          <div className="font-mono text-steel text-sm text-center" style={{ padding: '32px 0' }}>
+            Monitoring chain...
+          </div>
         )}
       </div>
     </div>
