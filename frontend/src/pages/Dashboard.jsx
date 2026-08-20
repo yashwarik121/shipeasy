@@ -7,7 +7,7 @@ import LiveEventFeed from '../components/feed/LiveEventFeed';
 
 const Dashboard = () => {
   const { account } = useWallet();
-  const contract = useContract();
+  const { getShipment, getShipmentCount, contract } = useContract();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('ALL');
   const [shipments, setShipments] = useState([]);
@@ -23,16 +23,16 @@ const Dashboard = () => {
       setLoading(true);
       try {
         if (!contract) return;
-        const total = await contract.shipmentCount();
-        const count = total.toNumber();
+        const total = await getShipmentCount();
+        const count = Number(total);
         
         let fetched = [];
         for (let i = 0; i < count; i++) {
-          const s = await contract.getShipment(i);
+          const s = await getShipment(i);
           fetched.push(s);
         }
         
-        fetched.sort((a, b) => b.lastUpdate.toNumber() - a.lastUpdate.toNumber());
+        fetched.sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt));
         setShipments(fetched);
       } catch (err) {
         console.error("Failed to fetch shipments", err);

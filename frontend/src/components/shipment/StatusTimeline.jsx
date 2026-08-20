@@ -24,7 +24,7 @@ const CustodyEntry = ({ entry, index, isLatest }) => {
       {/* Entry Details */}
       <div style={{ flex: 1, padding: '0 24px' }}>
         <div className="font-mono text-sm mb-1" style={{ wordBreak: 'break-all' }}>
-          <span className="text-steel">UPDATER:</span> {entry.updater}
+          <span className="text-steel">UPDATER:</span> {entry.updatedBy}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <span className={`status-text ${statusColor} font-bold`}>{getStatusText(entry.status)}</span>
@@ -50,7 +50,7 @@ const CustodyEntry = ({ entry, index, isLatest }) => {
             {formatTimestamp(entry.timestamp)}
           </div>
           <div className="font-mono text-xs" style={{ fontSize: '10px' }}>
-            SIG: {truncateAddress(entry.updater)}
+            SIG: {truncateAddress(entry.updatedBy)}
           </div>
         </div>
       </div>

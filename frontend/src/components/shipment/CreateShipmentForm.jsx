@@ -12,7 +12,7 @@ const CreateShipmentForm = () => {
   const [success, setSuccess] = useState(null);
   
   const { account } = useWallet();
-  const contract = useContract();
+  const { createShipment } = useContract();
   const navigate = useNavigate();
 
   const validateAddress = (addr) => {
@@ -41,27 +41,15 @@ const CreateShipmentForm = () => {
     setLoading(true);
 
     try {
-      const tx = await contract.createShipment(carrier, receiver, description);
-      
-      // Wait for confirmation
-      const receipt = await tx.wait();
-      
-      // Get shipment ID from event
-      const event = receipt.events?.find(e => e.event === 'ShipmentCreated');
-      const shipmentId = event ? event.args.shipmentId.toString() : null;
+      const receipt = await createShipment(carrier, receiver, description);
 
       setSuccess({
         blockNumber: receipt.blockNumber,
-        txHash: receipt.transactionHash,
-        shipmentId: shipmentId
+        txHash: receipt.hash
       });
 
       setTimeout(() => {
-        if (shipmentId) {
-          navigate(`/shipment/${shipmentId}`);
-        } else {
-          navigate('/dashboard');
-        }
+        navigate('/dashboard');
       }, 2000);
       
     } catch (err) {
@@ -84,7 +72,7 @@ const CreateShipmentForm = () => {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label className="section-label">CARRIER ADDRESS</label>
+          <label className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>CARRIER ADDRESS</label>
           <input 
             type="text" 
             value={carrier}
@@ -97,14 +85,15 @@ const CreateShipmentForm = () => {
               background: 'transparent', 
               color: 'var(--ink)',
               width: '100%',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              borderRadius: '0'
             }}
             disabled={loading || success}
           />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label className="section-label">RECEIVER ADDRESS</label>
+          <label className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>RECEIVER ADDRESS</label>
           <input 
             type="text" 
             value={receiver}
@@ -117,14 +106,15 @@ const CreateShipmentForm = () => {
               background: 'transparent', 
               color: 'var(--ink)',
               width: '100%',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              borderRadius: '0'
             }}
             disabled={loading || success}
           />
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label className="section-label">SHIPMENT DESCRIPTION</label>
+          <label className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>SHIPMENT DESCRIPTION</label>
           <textarea 
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -137,7 +127,8 @@ const CreateShipmentForm = () => {
               fontFamily: '"Inter", sans-serif',
               resize: 'vertical',
               width: '100%',
-              boxSizing: 'border-box'
+              boxSizing: 'border-box',
+              borderRadius: '0'
             }}
             disabled={loading || success}
           />
@@ -157,7 +148,7 @@ const CreateShipmentForm = () => {
             <div className="stamp animate-stamp" style={{ border: '2px solid var(--verified-green)', padding: '16px', textAlign: 'center' }}>
               <div className="text-green font-mono font-bold mb-2">CONFIRMED ON-CHAIN</div>
               <div className="text-green font-mono text-xs">BLOCK #{success.blockNumber}</div>
-              <div className="text-green font-mono text-xs">TX: {success.txHash.substring(0, 16)}...</div>
+              <div className="text-green font-mono text-xs">TX: {success.txHash ? success.txHash.substring(0, 16) + '...' : ''}</div>
             </div>
           )}
         </div>

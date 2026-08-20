@@ -2,7 +2,7 @@ import React from 'react';
 import { useWallet } from '../../context/WalletContext';
 
 const ConnectWallet = () => {
-  const { account, chainId, connect, disconnect, isCorrectNetwork, switchNetwork } = useWallet();
+  const { account, isConnected, isCorrectChain, connectWallet, disconnectWallet, switchToCorrectChain, networkName } = useWallet();
 
   const handleCopy = () => {
     if (account) {
@@ -11,36 +11,37 @@ const ConnectWallet = () => {
   };
 
   const formatAddress = (addr) => {
+    if (!addr) return '';
     return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
   };
 
-  if (!account) {
-    if (!window.ethereum) {
-      return (
-        <a 
-          href="https://metamask.io" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-sm font-mono text-ink"
-          style={{ textDecoration: 'underline' }}
-        >
-          INSTALL METAMASK
-        </a>
-      );
-    }
-
+  if (!window.ethereum) {
     return (
-      <button onClick={connect} className="btn-connect">
+      <a 
+        href="https://metamask.io" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="text-sm font-mono text-ink"
+        style={{ textDecoration: 'underline' }}
+      >
+        INSTALL METAMASK
+      </a>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <button onClick={connectWallet} className="btn-connect">
         CONNECT WALLET
       </button>
     );
   }
 
-  if (!isCorrectNetwork) {
+  if (!isCorrectChain) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span className="text-red font-mono font-bold">WRONG NETWORK</span>
-        <button onClick={switchNetwork} className="btn btn-danger" style={{ padding: '8px 16px', fontSize: '12px' }}>
+        <span className="text-red font-mono font-bold seal-red">WRONG NETWORK</span>
+        <button onClick={switchToCorrectChain} className="btn btn-danger" style={{ padding: '8px 16px', fontSize: '12px' }}>
           SWITCH NETWORK
         </button>
       </div>
@@ -58,7 +59,7 @@ const ConnectWallet = () => {
         {formatAddress(account)}
       </span>
       <span className="text-steel text-xs font-mono">
-        POLYGON AMOY
+        {networkName || "POLYGON AMOY"}
       </span>
     </div>
   );

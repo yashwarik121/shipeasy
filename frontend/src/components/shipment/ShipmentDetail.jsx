@@ -4,9 +4,9 @@ import { useWallet } from '../../context/WalletContext';
 import { useContract } from '../../hooks/useContract';
 import CustodyEntry from './StatusTimeline';
 
-const ShipmentDetail = ({ shipment, history }) => {
+const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
   const { account } = useWallet();
-  const contract = useContract();
+  const { advanceStatus } = useContract();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
@@ -15,28 +15,19 @@ const ShipmentDetail = ({ shipment, history }) => {
 
   const currentStatusText = getStatusText(shipment.status);
   const currentStatusColor = getStatusColor(shipment.status);
-  const isDelivered = shipment.status === 3;
+  const isDelivered = Number(shipment.status) === 3;
 
   const handleAdvanceStatus = async () => {
     if (!account) return;
     setLoading(true);
     setError('');
     try {
-      let tx;
-      if (shipment.status === 0) {
-        tx = await contract.pickupShipment(shipment.id);
-      } else if (shipment.status === 1) {
-        tx = await contract.markInTransit(shipment.id);
-      } else if (shipment.status === 2) {
-        tx = await contract.deliverShipment(shipment.id);
-      }
-      
-      const receipt = await tx.wait();
+      const nextStatus = Number(shipment.status) + 1;
+      const receipt = await advanceStatus(shipment.id, nextStatus);
       setSuccess({
         blockNumber: receipt.blockNumber,
-        txHash: receipt.transactionHash
+        txHash: receipt.hash
       });
-      // The page will auto-refresh to fetch new state based on requirements
     } catch (err) {
       setError(err.reason || err.message || 'Failed to update status');
     }
@@ -44,18 +35,20 @@ const ShipmentDetail = ({ shipment, history }) => {
   };
 
   const canAdvance = () => {
-    if (!account) return false;
+    if (readOnly || !account) return false;
     const lowerAccount = account.toLowerCase();
-    if (shipment.status === 0 && shipment.carrier.toLowerCase() === lowerAccount) return true;
-    if (shipment.status === 1 && shipment.carrier.toLowerCase() === lowerAccount) return true;
-    if (shipment.status === 2 && shipment.receiver.toLowerCase() === lowerAccount) return true;
+    const status = Number(shipment.status);
+    if (status === 0 && shipment.carrier.toLowerCase() === lowerAccount) return true;
+    if (status === 1 && shipment.carrier.toLowerCase() === lowerAccount) return true;
+    if (status === 2 && shipment.receiver.toLowerCase() === lowerAccount) return true;
     return false;
   };
 
   const getNextStatusText = () => {
-    if (shipment.status === 0) return 'PICK UP';
-    if (shipment.status === 1) return 'MARK IN TRANSIT';
-    if (shipment.status === 2) return 'DELIVER';
+    const status = Number(shipment.status);
+    if (status === 0) return 'PICK UP';
+    if (status === 1) return 'MARK IN TRANSIT';
+    if (status === 2) return 'CONFIRM DELIVERY';
     return '';
   };
 
@@ -65,7 +58,7 @@ const ShipmentDetail = ({ shipment, history }) => {
       {/* Top Section */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
         <div>
-          <h1 className="display-lg" style={{ margin: '0 0 8px 0' }}>SHIPMENT #{shipment.id.toString()}</h1>
+          <h1 className="display-lg" style={{ margin: '0 0 8px 0' }}>SHIPMENT #{String(shipment.id).padStart(3, '0')}</h1>
           <p style={{ margin: 0, fontSize: '16px', lineHeight: '1.5' }}>{shipment.description}</p>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -85,30 +78,30 @@ const ShipmentDetail = ({ shipment, history }) => {
       {/* Metadata Rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span className="section-label">SENDER</span>
+          <span className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>SENDER</span>
           <a href={getExplorerAddressUrl(shipment.sender)} target="_blank" rel="noopener noreferrer" className="chain-address copy-trigger">
             {shipment.sender}
           </a>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span className="section-label">CARRIER</span>
+          <span className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>CARRIER</span>
           <a href={getExplorerAddressUrl(shipment.carrier)} target="_blank" rel="noopener noreferrer" className="chain-address copy-trigger">
             {shipment.carrier}
           </a>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span className="section-label">RECEIVER</span>
+          <span className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>RECEIVER</span>
           <a href={getExplorerAddressUrl(shipment.receiver)} target="_blank" rel="noopener noreferrer" className="chain-address copy-trigger">
             {shipment.receiver}
           </a>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span className="section-label">INITIATED</span>
-          <span className="chain-timestamp">{formatTimestamp(shipment.lastUpdate)}</span>
+          <span className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>INITIATED</span>
+          <span className="chain-timestamp">{formatTimestamp(shipment.createdAt)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <span className="section-label">LAST RECORDED</span>
-          <span className="chain-timestamp">{formatTimestamp(shipment.lastUpdate)}</span>
+          <span className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>LAST RECORDED</span>
+          <span className="chain-timestamp">{formatTimestamp(shipment.updatedAt)}</span>
         </div>
       </div>
 
@@ -120,7 +113,11 @@ const ShipmentDetail = ({ shipment, history }) => {
         {history && history.map((entry, idx) => (
           <CustodyEntry 
             key={idx} 
-            entry={entry} 
+            entry={{
+              status: Number(entry.status),
+              updatedBy: entry.updatedBy || entry.updater,
+              timestamp: Number(entry.timestamp)
+            }}
             index={idx + 1} 
             isLatest={idx === history.length - 1} 
           />

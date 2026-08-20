@@ -5,7 +5,7 @@ import ShipmentDetail from '../components/shipment/ShipmentDetail';
 
 const ShipmentView = () => {
   const { id } = useParams();
-  const contract = useContract();
+  const { getShipment, getHistory, contract } = useContract();
   const [shipment, setShipment] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,8 +17,8 @@ const ShipmentView = () => {
     const fetchData = async () => {
       try {
         if (!contract) return;
-        const s = await contract.getShipment(id);
-        const h = await contract.getShipmentHistory(id);
+        const s = await getShipment(id);
+        const h = await getHistory(id);
         setShipment(s);
         setHistory(h);
         setError('');
@@ -33,10 +33,10 @@ const ShipmentView = () => {
 
     interval = setInterval(() => {
       fetchData();
-    }, 10000); // auto-refresh every 10 seconds
+    }, 10000);
 
     return () => clearInterval(interval);
-  }, [contract, id]);
+  }, [contract, id, getShipment, getHistory]);
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
@@ -44,7 +44,7 @@ const ShipmentView = () => {
       <div className="font-mono text-sm mb-4" style={{ color: 'var(--steel)' }}>
         <Link to="/dashboard" style={{ color: 'var(--ink)', textDecoration: 'none' }}>DASHBOARD</Link>
         {' > '}
-        <span>SHIPMENT #{id.padStart(3, '0')}</span>
+        <span>SHIPMENT #{String(id).padStart(3, '0')}</span>
       </div>
 
       {loading ? (
