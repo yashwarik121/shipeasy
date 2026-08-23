@@ -29,6 +29,7 @@ export const WalletProvider = ({ children }) => {
       
       if (window.ethereum) {
         const browserProvider = new BrowserProvider(window.ethereum);
+        browserProvider.pollingInterval = 15000; // 15s — prevents MetaMask RPC throttling
         setProvider(browserProvider);
         const currentSigner = await browserProvider.getSigner();
         setSigner(currentSigner);

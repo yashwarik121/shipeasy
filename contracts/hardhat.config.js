@@ -7,6 +7,12 @@ module.exports = {
     settings: { optimizer: { enabled: true, runs: 200 } },
   },
   networks: {
+    hardhat: {
+      mining: {
+        auto: true,
+        interval: 5000
+      }
+    },
     polygonAmoy: {
       url: process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology/",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],

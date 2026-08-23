@@ -51,7 +51,7 @@ const ShipmentCard = ({ shipment }) => {
         <span className="chain-address">{truncateAddress(shipment.carrier)}</span>
       </td>
       <td style={{ padding: '16px' }}>
-        <span className="chain-timestamp">{formatTimestamp(shipment.updatedAt)}</span>
+        <span className="chain-timestamp">{formatTimestamp(shipment.lastUpdated || shipment.updatedAt)}</span>
       </td>
     </tr>
   );

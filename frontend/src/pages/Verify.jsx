@@ -1,10 +1,5 @@
 import React, { useState } from 'react';
-import { ethers } from 'ethers';
 import ShipmentDetail from '../components/shipment/ShipmentDetail';
-import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../utils/contract';
-import { formatTimestamp, getStatusText } from '../utils/format';
-
-const RPC_URL = import.meta.env.VITE_RPC_URL || 'http://127.0.0.1:8545';
 
 const Verify = () => {
   const [searchId, setSearchId] = useState('');
@@ -25,40 +20,20 @@ const Verify = () => {
         throw new Error('Please enter a valid shipment ID.');
       }
 
-      const provider = new ethers.JsonRpcProvider(RPC_URL);
-      const readOnlyContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      // Fetch from backend API — no MetaMask/RPC needed
+      const shipRes = await fetch(`http://localhost:3001/api/shipments/${numId}`);
+      if (!shipRes.ok) throw new Error('No custody record found for this ID.');
+      const shipData = await shipRes.json();
 
-      const raw = await readOnlyContract.getShipment(numId);
-      const rawHistory = await readOnlyContract.getHistory(numId);
+      const histRes = await fetch(`http://localhost:3001/api/shipments/${numId}/history`);
+      const histData = histRes.ok ? await histRes.json() : [];
 
-      // Format the data — ethers v6 returns Result objects
-      const formattedShipment = {
-        id: Number(raw[0]),
-        sender: raw[1],
-        carrier: raw[2],
-        receiver: raw[3],
-        description: raw[4],
-        status: Number(raw[5]),
-        createdAt: Number(raw[6]),
-        lastUpdated: Number(raw[7])
-      };
-
-      const formattedHistory = rawHistory.map(entry => ({
-        status: Number(entry[0]),
-        updater: entry[1],
-        timestamp: Number(entry[2])
-      }));
-
-      setShipment(formattedShipment);
-      setHistory(formattedHistory);
+      setShipment(shipData);
+      setHistory(histData);
 
     } catch (err) {
       console.error(err);
-      if (err.reason?.includes('does not exist')) {
-        setError('No custody record found for this ID.');
-      } else {
-        setError(err.message || 'Failed to look up record.');
-      }
+      setError(err.message || 'Failed to look up record.');
     }
     setLoading(false);
   };

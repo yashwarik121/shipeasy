@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWallet } from '../context/WalletContext';
-import { useContract } from '../hooks/useContract';
 import ShipmentCard from '../components/shipment/ShipmentCard';
 import LiveEventFeed from '../components/feed/LiveEventFeed';
 
 const Dashboard = () => {
   const { account } = useWallet();
-  const { getShipment, getShipmentCount, contract } = useContract();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('ALL');
   const [shipments, setShipments] = useState([]);
@@ -22,18 +20,14 @@ const Dashboard = () => {
     const fetchShipments = async () => {
       setLoading(true);
       try {
-        if (!contract) return;
-        const total = await getShipmentCount();
-        const count = Number(total);
-        
-        let fetched = [];
-        for (let i = 0; i < count; i++) {
-          const s = await getShipment(i);
-          fetched.push(s);
+        // Fetch from backend API — no MetaMask RPC calls needed
+        const res = await fetch('http://localhost:3001/api/shipments');
+        if (res.ok) {
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : (data.value || []);
+          list.sort((a, b) => Number(b.lastUpdated || b.updatedAt || 0) - Number(a.lastUpdated || a.updatedAt || 0));
+          setShipments(list);
         }
-        
-        fetched.sort((a, b) => Number(b.updatedAt) - Number(a.updatedAt));
-        setShipments(fetched);
       } catch (err) {
         console.error("Failed to fetch shipments", err);
       }
@@ -41,7 +35,7 @@ const Dashboard = () => {
     };
 
     fetchShipments();
-  }, [account, contract, navigate]);
+  }, [account, navigate]);
 
   if (!account) return null;
 

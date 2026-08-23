@@ -97,11 +97,11 @@ const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>INITIATED</span>
-          <span className="chain-timestamp">{formatTimestamp(shipment.createdAt)}</span>
+          <span className="chain-timestamp">{formatTimestamp(shipment.createdAt || shipment.created_at)}</span>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
           <span className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>LAST RECORDED</span>
-          <span className="chain-timestamp">{formatTimestamp(shipment.updatedAt)}</span>
+          <span className="chain-timestamp">{formatTimestamp(shipment.updatedAt || shipment.lastUpdated || shipment.last_updated)}</span>
         </div>
       </div>
 

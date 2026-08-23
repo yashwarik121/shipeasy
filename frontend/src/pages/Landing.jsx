@@ -1,28 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useContract } from '../hooks/useContract';
 import CustodyEntry from '../components/shipment/StatusTimeline';
-import { formatSequenceNumber, getStatusText } from '../utils/format';
+import { getStatusText } from '../utils/format';
 
 const Landing = () => {
-  const { getShipment, getHistory, contract } = useContract();
   const [demoShipment, setDemoShipment] = useState(null);
   const [demoHistory, setDemoHistory] = useState([]);
 
   useEffect(() => {
     const fetchDemoData = async () => {
       try {
-        if (!contract) return;
-        const shipment = await getShipment(0);
-        const history = await getHistory(0);
-        setDemoShipment(shipment);
-        setDemoHistory(history);
+        // Fetch from backend API — no MetaMask/RPC needed
+        const shipRes = await fetch('http://localhost:3001/api/shipments/0');
+        if (shipRes.ok) {
+          const shipment = await shipRes.json();
+          setDemoShipment(shipment);
+        }
+        const histRes = await fetch('http://localhost:3001/api/shipments/0/history');
+        if (histRes.ok) {
+          const history = await histRes.json();
+          setDemoHistory(history);
+        }
       } catch (err) {
         console.error("Failed to fetch demo shipment:", err);
       }
     };
     fetchDemoData();
-  }, [contract, getShipment, getHistory]);
+  }, []);
 
   return (
     <div className="container" style={{ paddingTop: '64px', paddingBottom: '64px' }}>
@@ -51,7 +55,7 @@ const Landing = () => {
                 key={idx}
                 entry={{
                   status: Number(entry.status),
-                  updater: entry.updatedBy || entry.updater,
+                  updatedBy: entry.updatedBy || entry.updater,
                   timestamp: Number(entry.timestamp)
                 }}
                 index={idx + 1}
