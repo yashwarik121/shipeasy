@@ -1,142 +1,71 @@
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { BrowserProvider } from 'ethers';
+import { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import { JsonRpcProvider } from 'ethers';
 
 const WalletContext = createContext();
 
+const RPC_URL = 'http://127.0.0.1:8545';
+
+// Hardhat's default test accounts
+const TEST_ACCOUNTS = [
+  {
+    label: 'SENDER',
+    address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+    key: '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80',
+    index: 0
+  },
+  {
+    label: 'CARRIER',
+    address: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+    key: '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d',
+    index: 1
+  },
+  {
+    label: 'RECEIVER',
+    address: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
+    key: '0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a',
+    index: 2
+  }
+];
+
 export const WalletProvider = ({ children }) => {
-  const [account, setAccount] = useState(null);
+  const [selectedAccount, setSelectedAccount] = useState(null);
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
-  const [chainId, setChainId] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [error, setError] = useState(null);
 
-  const isCorrectChain = chainId === 80002n || chainId === 31337n;
+  const account = selectedAccount?.address || null;
+  const isConnected = !!selectedAccount;
+  const isCorrectChain = true; // Always correct — direct connection
+  const networkName = 'Hardhat Local';
+  const error = null;
 
-  const networkName = useMemo(() => {
-    if (chainId === 80002n) return 'Polygon Amoy';
-    if (chainId === 31337n) return 'Hardhat Local';
-    if (chainId) return `Unknown (${chainId})`;
-    return 'Unknown';
-  }, [chainId]);
-
-  const updateWalletState = useCallback(async (accounts) => {
-    if (accounts.length > 0) {
-      const currentAccount = accounts[0];
-      setAccount(currentAccount);
-      setIsConnected(true);
-      setError(null);
-      
-      if (window.ethereum) {
-        const browserProvider = new BrowserProvider(window.ethereum);
-        browserProvider.pollingInterval = 15000; // 15s — prevents MetaMask RPC throttling
-        setProvider(browserProvider);
-        const currentSigner = await browserProvider.getSigner();
-        setSigner(currentSigner);
-        
-        const network = await browserProvider.getNetwork();
-        setChainId(network.chainId);
-      }
-    } else {
-      setAccount(null);
-      setProvider(null);
-      setSigner(null);
-      setChainId(null);
-      setIsConnected(false);
+  const connectAs = useCallback(async (accountObj) => {
+    try {
+      const rpcProvider = new JsonRpcProvider(RPC_URL);
+      const rpcSigner = await rpcProvider.getSigner(accountObj.index);
+      setProvider(rpcProvider);
+      setSigner(rpcSigner);
+      setSelectedAccount(accountObj);
+    } catch (err) {
+      console.error('Failed to connect:', err);
     }
   }, []);
 
-  const connectWallet = async () => {
-    try {
-      if (!window.ethereum) {
-        throw new Error('MetaMask is not installed.');
-      }
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      await updateWalletState(accounts);
-    } catch (err) {
-      setError(err.message || 'Failed to connect wallet');
-    }
-  };
+  const connectWallet = useCallback(async () => {
+    // Default: connect as Sender
+    await connectAs(TEST_ACCOUNTS[0]);
+  }, [connectAs]);
 
-  const disconnectWallet = () => {
-    setAccount(null);
+  const disconnectWallet = useCallback(() => {
+    setSelectedAccount(null);
     setProvider(null);
     setSigner(null);
-    setChainId(null);
-    setIsConnected(false);
-    setError(null);
-  };
+  }, []);
 
-  const switchToCorrectChain = async () => {
-    if (!window.ethereum) return;
-    try {
-      // Try to switch to Polygon Amoy
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: '0x13882' }],
-      });
-    } catch (switchError) {
-      if (switchError.code === 4902) {
-        try {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [
-              {
-                chainId: '0x13882',
-                chainName: 'Polygon Amoy',
-                rpcUrls: ['https://rpc-amoy.polygon.technology'],
-                nativeCurrency: {
-                  name: 'MATIC',
-                  symbol: 'MATIC',
-                  decimals: 18,
-                },
-                blockExplorerUrls: ['https://amoy.polygonscan.com/'],
-              },
-            ],
-          });
-        } catch (addError) {
-          setError(addError.message);
-        }
-      } else {
-        setError(switchError.message);
-      }
-    }
-  };
+  const switchToCorrectChain = useCallback(async () => {
+    // No-op — always on correct chain
+  }, []);
 
-  useEffect(() => {
-    const checkIfConnected = async () => {
-      if (window.ethereum) {
-        try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-          if (accounts.length > 0) {
-            await updateWalletState(accounts);
-          }
-        } catch (err) {
-          console.error('Error checking wallet connection:', err);
-        }
-      }
-    };
-    
-    checkIfConnected();
-
-    if (window.ethereum) {
-      const handleAccountsChanged = (accounts) => {
-        updateWalletState(accounts);
-      };
-
-      const handleChainChanged = () => {
-        window.location.reload();
-      };
-
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      window.ethereum.on('chainChanged', handleChainChanged);
-
-      return () => {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
-      };
-    }
-  }, [updateWalletState]);
+  const chainId = 31337n;
 
   return (
     <WalletContext.Provider
@@ -151,6 +80,9 @@ export const WalletProvider = ({ children }) => {
         connectWallet,
         disconnectWallet,
         switchToCorrectChain,
+        connectAs,
+        selectedAccount,
+        testAccounts: TEST_ACCOUNTS,
         error
       }}
     >
