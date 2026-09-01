@@ -5,7 +5,7 @@ const ThemeContext = createContext();
 export const ThemeProvider = ({ children }) => {
   const [isDark, setIsDark] = useState(() => {
     const saved = localStorage.getItem('ship-eazy-theme');
-    return saved ? saved === 'dark' : true; // default to dark
+    return saved ? saved === 'dark' : false; // default to light
   });
 
   useEffect(() => {
