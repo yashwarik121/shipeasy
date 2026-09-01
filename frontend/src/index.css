@@ -440,3 +440,149 @@ code, .mono {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--ink);
 }
+
+[data-theme='dark'] {
+  --ink: #E8E6E1;
+  --paper: #0A0A0B;
+  --paper-dark: #111113;
+  --steel: #8A8D91;
+  --border-heavy: #E8E6E1;
+  --border-light: #2A2A2E;
+  --stamp-blue: #4A9FD9;
+  --verified-green: #4CAF50;
+  --seal-red: #E74C3C;
+}
+
+[data-theme='dark'] body {
+  background: #0A0A0B;
+  color: #E8E6E1;
+}
+
+[data-theme='dark'] input,
+[data-theme='dark'] textarea,
+[data-theme='dark'] select {
+  background: #111113;
+  color: #E8E6E1;
+  border-color: #E8E6E1;
+}
+
+[data-theme='dark'] .btn {
+  border-color: #E8E6E1;
+  color: #E8E6E1;
+  background: transparent;
+}
+
+[data-theme='dark'] .btn:hover {
+  background: #E8E6E1;
+  color: #0A0A0B;
+}
+
+[data-theme='dark'] .btn-primary {
+  background: #E8E6E1;
+  color: #0A0A0B;
+}
+
+[data-theme='dark'] .btn-primary:hover {
+  background: #8A8D91;
+}
+
+/* Fade in from below */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Fade in */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Slide in from left */
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-32px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Typewriter cursor blink */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Scan line expand */
+@keyframes expandLine {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+/* Glow pulse for crypto feel */
+@keyframes glowPulse {
+  0%, 100% { text-shadow: 0 0 4px currentColor; }
+  50% { text-shadow: 0 0 16px currentColor, 0 0 32px currentColor; }
+}
+
+/* Stagger animation helper classes */
+.animate-fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-fade-in {
+  opacity: 0;
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+.animate-slide-in-left {
+  opacity: 0;
+  animation: slideInLeft 0.5s ease-out forwards;
+}
+
+.delay-1 { animation-delay: 0.1s; }
+.delay-2 { animation-delay: 0.2s; }
+.delay-3 { animation-delay: 0.3s; }
+.delay-4 { animation-delay: 0.4s; }
+.delay-5 { animation-delay: 0.5s; }
+.delay-6 { animation-delay: 0.6s; }
+.delay-7 { animation-delay: 0.7s; }
+.delay-8 { animation-delay: 0.8s; }
+
+/* Smooth transitions for theme switching */
+body, 
+.btn, 
+input, 
+textarea, 
+a,
+header,
+footer,
+main {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Theme toggle switch */
+.theme-toggle {
+  width: 44px;
+  height: 22px;
+  border: 2px solid var(--ink);
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  padding: 0;
+  border-radius: 0; /* brutalist */
+}
+
+.theme-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--ink);
+  transition: transform 0.2s ease;
+}
+
+.theme-toggle.dark::after {
+  transform: translateX(20px);
+}
+

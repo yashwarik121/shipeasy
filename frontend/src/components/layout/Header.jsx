@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ConnectWallet from '../wallet/ConnectWallet';
+import { useTheme } from '../../context/ThemeContext';
 
 const Header = () => {
   const location = useLocation();
+  const { isDark, toggleTheme } = useTheme();
 
   const isActive = (path) => location.pathname === path;
 
@@ -69,7 +71,16 @@ const Header = () => {
         </nav>
       </div>
 
-      <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ fontSize: '12px', color: 'var(--ink)' }}>☀</span>
+          <button 
+            className={`theme-toggle ${isDark ? 'dark' : ''}`}
+            onClick={toggleTheme}
+            aria-label="Toggle theme"
+          />
+          <span style={{ fontSize: '12px', color: 'var(--ink)' }}>☽</span>
+        </div>
         <ConnectWallet />
       </div>
     </header>
