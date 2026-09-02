@@ -1,112 +1,66 @@
 import React, { useState, useEffect } from 'react';
 
 const SplashScreen = ({ onComplete }) => {
-  const [visible, setVisible] = useState(true);
+  const [phase, setPhase] = useState(0); // 0=logo, 1=line, 2=fade out
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setVisible(false);
+    const t1 = setTimeout(() => setPhase(1), 600);   // line expands
+    const t2 = setTimeout(() => setPhase(2), 1400);   // start fade out
+    const t3 = setTimeout(() => {
       if (onComplete) onComplete();
-    }, 3000); // 3 seconds total for animations
+    }, 1900); // done
 
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [onComplete]);
 
-  if (!visible) return null;
-
   return (
-    <div className="splash-container">
-      <style>{`
-        .splash-container {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100vw;
-          height: 100vh;
-          background: #0A0A0A;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          z-index: 9999;
-          animation: fadeOut 0.5s ease-out 2.5s forwards;
-        }
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 9999,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'var(--paper, #F2F0EA)',
+      opacity: phase === 2 ? 0 : 1,
+      transition: 'opacity 0.5s ease-out',
+    }}>
+      {/* Logo */}
+      <div style={{
+        fontFamily: "'Archivo Black', sans-serif",
+        fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
+        color: 'var(--ink, #0A0A0A)',
+        letterSpacing: '-0.03em',
+        textTransform: 'uppercase',
+        opacity: phase >= 0 ? 1 : 0,
+        transform: phase >= 0 ? 'translateY(0)' : 'translateY(12px)',
+        transition: 'opacity 0.4s ease-out, transform 0.4s ease-out',
+      }}>
+        SHIP.EAZY
+      </div>
 
-        .splash-content {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          width: 100%;
-          max-width: 600px;
-          padding: 0 24px;
-        }
+      {/* Expanding line */}
+      <div style={{
+        height: '3px',
+        backgroundColor: 'var(--ink, #0A0A0A)',
+        marginTop: '16px',
+        width: phase >= 1 ? '200px' : '0px',
+        transition: 'width 0.4s ease-out',
+      }} />
 
-        .typewriter {
-          font-family: 'JetBrains Mono', monospace;
-          color: #00FF41;
-          font-size: clamp(2rem, 5vw, 4rem);
-          font-weight: 700;
-          letter-spacing: 0.1em;
-          margin: 0;
-          overflow: hidden;
-          white-space: nowrap;
-          border-right: 4px solid #00FF41;
-          animation: typing 1s steps(9, end) forwards, cursorBlink 0.75s step-end infinite;
-          width: 0;
-          text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
-        }
-
-        .scan-line {
-          height: 2px;
-          background: #00FF41;
-          margin: 24px 0;
-          box-shadow: 0 0 8px #00FF41;
-          animation: expandScan 0.5s ease-out 1s forwards;
-          width: 0;
-          opacity: 0;
-        }
-
-        .init-text {
-          font-family: 'JetBrains Mono', monospace;
-          color: #00FF41;
-          font-size: 0.875rem;
-          letter-spacing: 0.15em;
-          text-transform: uppercase;
-          opacity: 0;
-          animation: appearAndBlink 1s step-end 1.5s forwards;
-        }
-
-        @keyframes typing {
-          from { width: 0; }
-          to { width: 100%; }
-        }
-
-        @keyframes cursorBlink {
-          from, to { border-color: transparent; }
-          50% { border-color: #00FF41; }
-        }
-
-        @keyframes expandScan {
-          from { width: 0; opacity: 1; }
-          to { width: 100%; opacity: 1; }
-        }
-
-        @keyframes appearAndBlink {
-          0% { opacity: 0; }
-          10%, 30%, 50%, 70%, 90% { opacity: 1; }
-          20%, 40%, 60%, 80%, 100% { opacity: 0.3; }
-        }
-
-        @keyframes fadeOut {
-          from { opacity: 1; }
-          to { opacity: 0; visibility: hidden; }
-        }
-      `}</style>
-
-      <div className="splash-content">
-        <h1 className="typewriter">SHIP.EAZY</h1>
-        <div className="scan-line"></div>
-        <div className="init-text">INITIALIZING CUSTODY PROTOCOL...</div>
+      {/* Tagline */}
+      <div style={{
+        fontFamily: "'JetBrains Mono', monospace",
+        fontSize: '0.75rem',
+        color: 'var(--steel, #4A4E52)',
+        letterSpacing: '0.15em',
+        textTransform: 'uppercase',
+        marginTop: '14px',
+        opacity: phase >= 1 ? 1 : 0,
+        transition: 'opacity 0.3s ease-out 0.1s',
+      }}>
+        CUSTODY PROTOCOL
       </div>
     </div>
   );

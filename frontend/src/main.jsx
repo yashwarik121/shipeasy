@@ -8,17 +8,14 @@ import './index.css';
 
 const Root = () => {
   const [showSplash, setShowSplash] = useState(true);
-  
+
   return (
     <React.StrictMode>
       <ThemeProvider>
-        {showSplash ? (
-          <SplashScreen onComplete={() => setShowSplash(false)} />
-        ) : (
-          <WalletProvider>
-            <App />
-          </WalletProvider>
-        )}
+        <WalletProvider>
+          {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
+          <App />
+        </WalletProvider>
       </ThemeProvider>
     </React.StrictMode>
   );
