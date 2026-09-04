@@ -37,9 +37,9 @@ class CacheService {
 
   upsertShipment(shipment) {
     this.db.run(
-      `INSERT OR REPLACE INTO shipments (id, sender, carrier, receiver, description, status, created_at, last_updated)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [shipment.id, shipment.sender, shipment.carrier, shipment.receiver, shipment.description, shipment.status, shipment.createdAt, shipment.lastUpdated]
+      `INSERT OR REPLACE INTO shipments (id, sender, carrier, receiver, description, status, created_at, last_updated, access_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [shipment.id, shipment.sender, shipment.carrier, shipment.receiver, shipment.description, shipment.status, shipment.createdAt, shipment.lastUpdated, shipment.accessKey]
     );
     this._save();
   }
@@ -62,6 +62,58 @@ class CacheService {
     this._save();
   }
 
+  addDocument(doc) {
+    this.db.run(
+      `INSERT INTO documents (shipment_id, file_hash, file_name, file_path, file_size, mime_type, uploader, uploaded_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [doc.shipmentId, doc.fileHash, doc.fileName, doc.filePath, doc.fileSize, doc.mimeType, doc.uploader, doc.uploadedAt]
+    );
+    this._save();
+    const result = this.db.exec('SELECT last_insert_rowid() AS id');
+    return result[0].values[0][0];
+  }
+
+  getDocuments(shipmentId) {
+    const result = this.db.exec('SELECT * FROM documents WHERE shipment_id = ? ORDER BY uploaded_at DESC', [shipmentId]);
+    if (!result.length) return [];
+    const cols = result[0].columns;
+    return result[0].values.map(row => {
+      const obj = {};
+      cols.forEach((col, i) => obj[col] = row[i]);
+      return {
+        id: obj.id,
+        shipmentId: obj.shipment_id,
+        fileHash: obj.file_hash,
+        fileName: obj.file_name,
+        filePath: obj.file_path,
+        fileSize: obj.file_size,
+        mimeType: obj.mime_type,
+        uploader: obj.uploader,
+        uploadedAt: obj.uploaded_at
+      };
+    });
+  }
+
+  getDocument(docId) {
+    const result = this.db.exec('SELECT * FROM documents WHERE id = ?', [docId]);
+    if (!result.length || !result[0].values.length) return null;
+    const cols = result[0].columns;
+    const row = result[0].values[0];
+    const obj = {};
+    cols.forEach((col, i) => obj[col] = row[i]);
+    return {
+      id: obj.id,
+      shipmentId: obj.shipment_id,
+      fileHash: obj.file_hash,
+      fileName: obj.file_name,
+      filePath: obj.file_path,
+      fileSize: obj.file_size,
+      mimeType: obj.mime_type,
+      uploader: obj.uploader,
+      uploadedAt: obj.uploaded_at
+    };
+  }
+
   getShipment(id) {
     const result = this.db.exec('SELECT * FROM shipments WHERE id = ?', [id]);
     if (!result.length || !result[0].values.length) return null;
@@ -77,7 +129,8 @@ class CacheService {
       description: obj.description,
       status: obj.status,
       createdAt: obj.created_at,
-      lastUpdated: obj.last_updated
+      lastUpdated: obj.last_updated,
+      accessKey: obj.access_key
     };
   }
 
@@ -96,7 +149,8 @@ class CacheService {
         description: obj.description,
         status: obj.status,
         createdAt: obj.created_at,
-        lastUpdated: obj.last_updated
+        lastUpdated: obj.last_updated,
+        accessKey: obj.access_key
       };
     });
   }

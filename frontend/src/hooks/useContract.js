@@ -60,8 +60,9 @@ export const useContract = () => {
         receiver: data[3],
         description: data[4],
         status: data[5],
-        createdAt: data[6],
-        updatedAt: data[7]
+        accessKey: data[6],
+        createdAt: data[7],
+        updatedAt: data[8]
       };
     } catch (err) {
       throw err;
@@ -91,6 +92,38 @@ export const useContract = () => {
     }
   }, [contract]);
 
+  const addDocument = useCallback(async (shipmentId, fileHash, fileName) => {
+    if (!contract || !signer) throw new Error('Contract or signer not available');
+    setLoading(true);
+    setError(null);
+    try {
+        const tx = await contract.addDocument(shipmentId, fileHash, fileName);
+        const receipt = await tx.wait();
+        setLoading(false);
+        return receipt;
+    } catch (err) {
+        setError(err.message || 'Failed to add document');
+        setLoading(false);
+        throw err;
+    }
+  }, [contract, signer]);
+
+  const getDocuments = useCallback(async (shipmentId) => {
+    if (!contract) throw new Error('Contract not available');
+    const data = await contract.getDocuments(shipmentId);
+    return data.map(doc => ({
+        fileHash: doc[0],
+        fileName: doc[1],
+        uploader: doc[2],
+        timestamp: Number(doc[3])
+    }));
+  }, [contract]);
+
+  const getAccessKey = useCallback(async (shipmentId) => {
+    if (!contract) throw new Error('Contract not available');
+    return await contract.getAccessKey(shipmentId);
+  }, [contract]);
+
   return {
     contract,
     createShipment,
@@ -98,6 +131,9 @@ export const useContract = () => {
     getShipment,
     getHistory,
     getShipmentCount,
+    addDocument,
+    getDocuments,
+    getAccessKey,
     loading,
     error
   };

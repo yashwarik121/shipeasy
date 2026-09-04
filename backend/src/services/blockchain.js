@@ -23,14 +23,15 @@ class BlockchainService {
 
   formatShipment(raw) {
     return {
-      id: Number(raw.id),
-      sender: raw.sender,
-      carrier: raw.carrier,
-      receiver: raw.receiver,
-      description: raw.description,
-      status: Number(raw.status),
-      createdAt: Number(raw.createdAt),
-      lastUpdated: Number(raw.lastUpdated)
+      id: Number(raw[0] ?? raw.id),
+      sender: raw[1] ?? raw.sender,
+      carrier: raw[2] ?? raw.carrier,
+      receiver: raw[3] ?? raw.receiver,
+      description: raw[4] ?? raw.description,
+      status: Number(raw[5] ?? raw.status),
+      accessKey: raw[6] ?? raw.accessKey,
+      createdAt: Number(raw[7] ?? raw.createdAt),
+      lastUpdated: Number(raw[8] ?? raw.lastUpdated)
     };
   }
 

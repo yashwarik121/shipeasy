@@ -7,21 +7,37 @@ const CreateShipmentForm = () => {
   const [carrier, setCarrier] = useState('');
   const [receiver, setReceiver] = useState('');
   const [description, setDescription] = useState('');
+  const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
+  const [progress, setProgress] = useState([]);
   
   const { account } = useWallet();
-  const { createShipment } = useContract();
+  const { createShipment, addDocument } = useContract();
   const navigate = useNavigate();
 
   const validateAddress = (addr) => {
     return /^0x[a-fA-F0-9]{40}$/.test(addr);
   };
 
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      setFiles(Array.from(e.target.files));
+    }
+  };
+
+  const hashFile = async (file) => {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setProgress([]);
     
     if (!validateAddress(carrier)) {
       setError('Invalid carrier address. Must be 0x followed by 40 hex characters.');
@@ -41,7 +57,55 @@ const CreateShipmentForm = () => {
     setLoading(true);
 
     try {
+      setProgress(p => [...p, 'CREATING SHIPMENT ON-CHAIN...']);
       const receipt = await createShipment(carrier, receiver, description);
+      
+      let shipmentId;
+      try {
+        const res = await fetch('http://localhost:3001/api/shipments');
+        const data = await res.json();
+        shipmentId = data.length - 1;
+      } catch (err) {
+        console.error('Failed to fetch shipment ID', err);
+        throw new Error('Failed to retrieve shipment ID after creation');
+      }
+
+      if (files.length > 0) {
+        setProgress(p => [...p, '✓ SHIPMENT CREATED', 'HASHING FILES...']);
+        
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const hash = await hashFile(file);
+          
+          setProgress(p => {
+             const newP = [...p];
+             if (!newP.includes('WRITING HASHES TO CHAIN...')) newP.push('WRITING HASHES TO CHAIN...');
+             return newP;
+          });
+          
+          await addDocument(shipmentId, hash, file.name);
+          
+          setProgress(p => {
+             const newP = [...p];
+             if (!newP.includes('UPLOADING FILES...')) newP.push('UPLOADING FILES...');
+             return newP;
+          });
+
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('address', account);
+
+          const uploadRes = await fetch(`http://localhost:3001/api/shipments/${shipmentId}/documents`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!uploadRes.ok) {
+            throw new Error(`Failed to upload ${file.name}`);
+          }
+        }
+        setProgress(p => [...p, '✓ ALL FILES UPLOADED']);
+      }
 
       setSuccess({
         blockNumber: receipt.blockNumber,
@@ -134,6 +198,53 @@ const CreateShipmentForm = () => {
           />
         </div>
 
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <label className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>ATTACH DOCUMENTS</label>
+          <div style={{ position: 'relative' }}>
+            <input 
+              type="file" 
+              multiple 
+              accept="image/*,application/pdf"
+              onChange={handleFileChange}
+              disabled={loading || success}
+              style={{
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+                opacity: 0,
+                cursor: 'pointer'
+              }}
+            />
+            <div style={{
+              padding: '32px',
+              border: '2px dashed var(--ink)',
+              textAlign: 'center',
+              fontFamily: 'var(--font-mono)',
+              background: 'var(--paper)',
+              color: 'var(--ink)'
+            }}>
+              DROP FILES OR CLICK TO ATTACH
+            </div>
+          </div>
+          {files.length > 0 && (
+            <div style={{ marginTop: '8px' }}>
+              {files.map((f, i) => (
+                <div key={i} className="font-mono text-sm">
+                  - {f.name} ({(f.size / 1024).toFixed(1)} KB)
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {progress.length > 0 && (
+          <div style={{ padding: '16px', border: '2px solid var(--ink)', background: 'var(--steel)', color: 'white' }} className="font-mono text-sm">
+            {progress.map((step, i) => (
+              <div key={i}>{step}</div>
+            ))}
+          </div>
+        )}
+
         <div style={{ marginTop: '16px', border: success ? '2px solid var(--verified-green)' : 'none', position: 'relative' }} className={success ? 'animate-stamp-flash' : ''}>
           {!success ? (
             <button 
@@ -142,7 +253,7 @@ const CreateShipmentForm = () => {
               style={{ width: '100%', padding: '16px', fontSize: '16px' }}
               disabled={loading || !account}
             >
-              {loading ? 'AWAITING CONFIRMATION...' : 'SUBMIT TO CHAIN'}
+              {loading ? 'PROCESSING...' : 'SUBMIT TO CHAIN'}
             </button>
           ) : (
             <div className="stamp animate-stamp" style={{ border: '2px solid var(--verified-green)', padding: '16px', textAlign: 'center' }}>
