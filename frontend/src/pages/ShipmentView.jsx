@@ -1,26 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useContract } from '../hooks/useContract';
 import ShipmentDetail from '../components/shipment/ShipmentDetail';
 
 const ShipmentView = () => {
   const { id } = useParams();
-  const { getShipment, getHistory, contract } = useContract();
   const [shipment, setShipment] = useState(null);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    let interval;
-
     const fetchData = async () => {
       try {
-        if (!contract) return;
-        const s = await getShipment(id);
-        const h = await getHistory(id);
-        setShipment(s);
-        setHistory(h);
+        const shipRes = await fetch(`http://localhost:3001/api/shipments/${id}`);
+        if (!shipRes.ok) throw new Error('NOT FOUND');
+        const shipData = await shipRes.json();
+        setShipment(shipData);
+
+        const histRes = await fetch(`http://localhost:3001/api/shipments/${id}/history`);
+        if (histRes.ok) {
+          const histData = await histRes.json();
+          setHistory(histData);
+        }
         setError('');
       } catch (err) {
         console.error(err);
@@ -30,13 +31,9 @@ const ShipmentView = () => {
     };
 
     fetchData();
-
-    interval = setInterval(() => {
-      fetchData();
-    }, 10000);
-
+    const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
-  }, [contract, id, getShipment, getHistory]);
+  }, [id]);
 
   return (
     <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
