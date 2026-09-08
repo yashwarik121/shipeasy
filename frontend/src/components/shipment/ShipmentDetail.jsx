@@ -17,7 +17,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
   const [keyError, setKeyError] = useState('');
 
   useEffect(() => {
-    if (shipment && shipment.id) {
+    if (shipment && shipment.id != null) {
       fetchDocuments();
     }
   }, [shipment]);
@@ -64,8 +64,14 @@ const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
       if (!keyToUse) return;
     }
     
+    let addressToUse = account;
+    if (!addressToUse) {
+      addressToUse = window.prompt('Enter your wallet address (sender or receiver):');
+      if (!addressToUse) return;
+    }
+    
     try {
-      const url = `http://localhost:3001/api/shipments/${shipment.id}/documents/${docId}/download?address=${account}&accessKey=${keyToUse}`;
+      const url = `http://localhost:3001/api/shipments/${shipment.id}/documents/${docId}/download?address=${addressToUse}&accessKey=${keyToUse}`;
       const res = await fetch(url);
       
       if (res.status === 403) {
