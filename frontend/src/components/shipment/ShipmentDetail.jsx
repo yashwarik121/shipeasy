@@ -15,6 +15,9 @@ const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
   const [verifications, setVerifications] = useState({});
   const [accessKey, setAccessKey] = useState('');
   const [keyError, setKeyError] = useState('');
+  const [enteredKey, setEnteredKey] = useState('');
+  const [keyValidated, setKeyValidated] = useState(false);
+  const [keyMsg, setKeyMsg] = useState('');
 
   useEffect(() => {
     if (shipment && shipment.id != null) {
@@ -57,39 +60,73 @@ const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
     }
   };
 
-  const handleDownload = async (docId, filename) => {
-    let keyToUse = accessKey;
-    if (!keyToUse) {
-      keyToUse = window.prompt('Enter access key to download this document:');
-      if (!keyToUse) return;
+  const handleValidateKey = async () => {
+    if (!enteredKey.trim()) {
+      setKeyMsg('ENTER AN ACCESS KEY');
+      setKeyValidated(false);
+      return;
     }
-    
-    let addressToUse = account;
-    if (!addressToUse) {
-      addressToUse = window.prompt('Enter your wallet address (sender or receiver):');
-      if (!addressToUse) return;
-    }
-    
+    // Try a test download to validate the key
+    const addressToUse = account || shipment.sender;
     try {
-      const url = `http://localhost:3001/api/shipments/${shipment.id}/documents/${docId}/download?address=${addressToUse}&accessKey=${keyToUse}`;
-      const res = await fetch(url);
-      
-      if (res.status === 403) {
-        alert('ACCESS DENIED — invalid key or unauthorized address');
-        return;
+      const res = await fetch(
+        `http://localhost:3001/api/shipments/${shipment.id}/documents/${documents[0]?.id}/download?address=${addressToUse}&accessKey=${enteredKey.trim()}`,
+        { method: 'HEAD' }
+      );
+      if (res.ok || res.status === 200) {
+        setKeyValidated(true);
+        setKeyMsg('✓ KEY VALIDATED — DOCUMENTS UNLOCKED');
+      } else {
+        setKeyValidated(false);
+        setKeyMsg('✗ INVALID KEY OR UNAUTHORIZED ADDRESS');
       }
-      
-      if (!res.ok) throw new Error('Download failed');
-      
+    } catch {
+      // If HEAD not supported, just accept the key and let download validate
+      setKeyValidated(true);
+      setKeyMsg('✓ KEY ACCEPTED');
+    }
+  };
+
+  const getFileUrl = (docId) => {
+    const addressToUse = account || shipment.sender;
+    return `http://localhost:3001/api/shipments/${shipment.id}/documents/${docId}/download?address=${addressToUse}&accessKey=${enteredKey.trim()}`;
+  };
+
+  const handleView = async (docId, filename) => {
+    if (!keyValidated) {
+      setKeyMsg('⚠ ENTER AND VALIDATE ACCESS KEY FIRST');
+      return;
+    }
+    try {
+      const res = await fetch(getFileUrl(docId));
+      if (res.status === 403) { setKeyMsg('✗ ACCESS DENIED'); setKeyValidated(false); return; }
+      if (!res.ok) throw new Error('Failed');
       const blob = await res.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      alert('Error viewing document');
+    }
+  };
+
+  const handleDownload = async (docId, filename) => {
+    if (!keyValidated) {
+      setKeyMsg('⚠ ENTER AND VALIDATE ACCESS KEY FIRST');
+      return;
+    }
+    try {
+      const res = await fetch(getFileUrl(docId));
+      if (res.status === 403) { setKeyMsg('✗ ACCESS DENIED'); setKeyValidated(false); return; }
+      if (!res.ok) throw new Error('Failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = downloadUrl;
+      a.href = url;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(downloadUrl);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       alert('Error downloading document');
     }
@@ -218,28 +255,69 @@ const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
         <>
           <div style={{ borderBottom: '4px solid var(--ink)', margin: '32px -32px 32px -32px' }}></div>
           <h2 className="section-label mb-4">ATTACHED DOCUMENTS</h2>
+
+          {/* Access Key Input */}
+          <div style={{ border: '2px solid var(--ink)', padding: '16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <span className="font-mono text-xs" style={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>🔑 ACCESS KEY:</span>
+            <input
+              type="text"
+              value={enteredKey}
+              onChange={(e) => { setEnteredKey(e.target.value); setKeyValidated(false); setKeyMsg(''); }}
+              placeholder="Enter access key to unlock documents..."
+              className="font-mono"
+              style={{
+                flex: 1, padding: '8px 12px', border: '2px solid var(--steel)',
+                background: 'transparent', fontSize: '12px', borderRadius: 0,
+                color: 'var(--ink)'
+              }}
+            />
+            <button
+              className="btn font-mono"
+              style={{ padding: '8px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}
+              onClick={handleValidateKey}
+            >
+              VALIDATE
+            </button>
+          </div>
+          {keyMsg && (
+            <div className="font-mono text-xs mb-4" style={{ color: keyValidated ? 'var(--verified-green)' : 'var(--seal-red)', fontWeight: 'bold' }}>
+              {keyMsg}
+            </div>
+          )}
+
+          {/* Document List */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {documents.map(doc => (
-              <div key={doc.id} style={{ border: '2px solid var(--ink)', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div className="font-mono mb-2">{doc.filename || doc.fileName}</div>
-                  <div className="font-mono text-xs text-steel mb-1">HASH: {(doc.fileHash || '').substring(0, 16)}...</div>
-                  <div className="font-mono text-xs text-steel">UPLOADER: {(doc.uploader || '').substring(0, 16)}...</div>
-                  <div className="font-mono text-xs text-steel mt-2">{formatTimestamp(doc.uploadedAt || doc.timestamp)}</div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '12px' }}>
-                  {verifications[doc.id] !== undefined && (
-                    <div className="font-mono text-xs font-bold" style={{ color: verifications[doc.id] ? 'var(--verified-green)' : 'var(--seal-red)' }}>
-                      {verifications[doc.id] ? '✓ HASH VERIFIED' : '✗ HASH MISMATCH'}
+              <div key={doc.id} style={{ border: '2px solid var(--ink)', padding: '16px', opacity: keyValidated ? 1 : 0.6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <div className="font-mono mb-2" style={{ fontWeight: 'bold' }}>{doc.filename || doc.fileName}</div>
+                    <div className="font-mono text-xs text-steel mb-1">HASH: {(doc.fileHash || '').substring(0, 20)}...</div>
+                    <div className="font-mono text-xs text-steel">{formatTimestamp(doc.uploadedAt || doc.timestamp)}</div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                    {verifications[doc.id] !== undefined && (
+                      <div className="font-mono text-xs font-bold" style={{ color: verifications[doc.id] ? 'var(--verified-green)' : 'var(--seal-red)' }}>
+                        {verifications[doc.id] ? '✓ HASH VERIFIED' : '✗ HASH MISMATCH'}
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        className="btn font-mono"
+                        style={{ padding: '6px 14px', fontSize: '11px' }}
+                        onClick={() => handleView(doc.id, doc.filename || doc.fileName)}
+                      >
+                        VIEW
+                      </button>
+                      <button
+                        className="btn btn-primary font-mono"
+                        style={{ padding: '6px 14px', fontSize: '11px' }}
+                        onClick={() => handleDownload(doc.id, doc.filename || doc.fileName)}
+                      >
+                        DOWNLOAD
+                      </button>
                     </div>
-                  )}
-                  <button 
-                    className="btn btn-primary font-mono" 
-                    onClick={() => handleDownload(doc.id, doc.filename || doc.fileName)}
-                    style={{ padding: '8px 16px' }}
-                  >
-                    DOWNLOAD
-                  </button>
+                  </div>
                 </div>
               </div>
             ))}
