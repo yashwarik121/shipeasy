@@ -7,6 +7,7 @@ const CacheService = require('./services/cache');
 const BlockchainService = require('./services/blockchain');
 const shipmentRoutes = require('./routes/shipments');
 const documentRoutes = require('./routes/documents');
+const tamperRoutes = require('./routes/tamper');
 
 const app = express();
 
@@ -15,6 +16,7 @@ app.use(express.json());
 
 app.use('/api', shipmentRoutes);
 app.use('/api', documentRoutes);
+app.use('/api', tamperRoutes);
 
 async function startServer() {
   try {

@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import CreateShipment from './pages/CreateShipment';
 import ShipmentView from './pages/ShipmentView';
 import Verify from './pages/Verify';
+import TamperLab from './pages/TamperLab';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/create" element={<CreateShipment />} />
           <Route path="/shipment/:id" element={<ShipmentView />} />
           <Route path="/verify" element={<Verify />} />
+          <Route path="/tamper-lab" element={<TamperLab />} />
         </Routes>
       </Layout>
     </BrowserRouter>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ConnectWallet from '../wallet/ConnectWallet';
 import { useTheme } from '../../context/ThemeContext';
@@ -6,8 +6,26 @@ import { useTheme } from '../../context/ThemeContext';
 const Header = () => {
   const location = useLocation();
   const { isDark, toggleTheme } = useTheme();
+  const [tamperAlert, setTamperAlert] = useState(false);
 
   const isActive = (path) => location.pathname === path;
+
+  // Poll audit status for live navbar indicator
+  useEffect(() => {
+    const checkAudit = () => {
+      fetch('http://localhost:3001/api/tamper/audit')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.tamperDetected !== undefined) {
+            setTamperAlert(data.tamperDetected);
+          }
+        })
+        .catch(() => {});
+    };
+    checkAudit();
+    const interval = setInterval(checkAudit, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <header style={{
@@ -25,7 +43,7 @@ const Header = () => {
           </span>
         </Link>
         
-        <nav style={{ display: 'flex', gap: '24px' }}>
+        <nav style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
           <Link 
             to="/dashboard" 
             style={{ 
@@ -67,6 +85,34 @@ const Header = () => {
             }}
           >
             VERIFY
+          </Link>
+          <Link 
+            to="/tamper-lab" 
+            style={{ 
+              textDecoration: 'none', 
+              color: tamperAlert ? 'var(--seal-red)' : 'var(--stamp-blue)',
+              fontFamily: 'var(--font-mono)',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderBottom: isActive('/tamper-lab') ? `3px solid ${tamperAlert ? 'var(--seal-red)' : 'var(--stamp-blue)'}` : '3px solid transparent',
+              paddingBottom: '4px'
+            }}
+          >
+            <span>{tamperAlert ? '🚨' : '🧪'} TAMPER LAB</span>
+            {tamperAlert && (
+              <span style={{
+                background: 'var(--seal-red)',
+                color: '#fff',
+                fontSize: '10px',
+                padding: '2px 6px',
+                lineHeight: 1
+              }}>
+                ALERT
+              </span>
+            )}
           </Link>
         </nav>
       </div>

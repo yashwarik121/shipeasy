@@ -11,6 +11,7 @@ const Landing = () => {
   const [scrollY, setScrollY] = useState(0);
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 }); // normalized 0-1
   const [particles, setParticles] = useState([]);
+  const [tamperDetected, setTamperDetected] = useState(false);
   const heroRef = useRef(null);
 
   useEffect(() => {
@@ -18,6 +19,11 @@ const Landing = () => {
       .then(r => r.json())
       .then(d => { setShipments(Array.isArray(d) ? d : []); setLoaded(true); })
       .catch(() => setLoaded(true));
+
+    fetch('http://localhost:3001/api/tamper/audit')
+      .then(r => r.json())
+      .then(d => { if (d && d.tamperDetected) setTamperDetected(true); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -302,6 +308,13 @@ const Landing = () => {
               }}>
                 <Link to="/dashboard" className="cta-btn">ENTER DASHBOARD</Link>
                 <Link to="/create" className="cta-btn cta-outline">NEW TRANSFER</Link>
+                <Link to="/tamper-lab" className="cta-btn" style={{
+                  background: tamperDetected ? 'var(--seal-red)' : 'transparent',
+                  color: tamperDetected ? '#fff' : 'var(--stamp-blue)',
+                  borderColor: tamperDetected ? 'var(--seal-red)' : 'var(--stamp-blue)'
+                }}>
+                  {tamperDetected ? '🚨 TAMPER DETECTED' : '🧪 LAUNCH TAMPER LAB'}
+                </Link>
               </div>
             </div>
           </section>
@@ -311,7 +324,7 @@ const Landing = () => {
             {[
               { label: 'SHIPMENTS', value: loaded ? shipments.length : '—', icon: '◈' },
               { label: 'CHAIN', value: 'HARDHAT', icon: '⛓' },
-              { label: 'PROTOCOL', value: 'CUSTODY v1', icon: '⬡' },
+              { label: 'TAMPER AUDIT', value: tamperDetected ? '🚨 COMPROMISED' : '✓ 100% SECURE', color: tamperDetected ? 'var(--seal-red)' : 'var(--verified-green)', icon: '🛡' },
               { label: 'STATUS', value: '● LIVE', color: 'var(--verified-green)', icon: '◉' }
             ].map((s, i) => (
               <div key={i} className="stat-card vis" style={{ flex: '1 1 200px', transitionDelay: `${i * 0.1}s` }}>
