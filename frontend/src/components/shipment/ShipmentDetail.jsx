@@ -4,7 +4,7 @@ import { useWallet } from '../../context/WalletContext';
 import { useContract } from '../../hooks/useContract';
 import CustodyEntry from './StatusTimeline';
 
-const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
+const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey = '' }) => {
   const { account } = useWallet();
   const { advanceStatus, getAccessKey } = useContract();
   const [loading, setLoading] = useState(false);
@@ -15,9 +15,9 @@ const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
   const [verifications, setVerifications] = useState({});
   const [accessKey, setAccessKey] = useState('');
   const [keyError, setKeyError] = useState('');
-  const [enteredKey, setEnteredKey] = useState('');
-  const [keyValidated, setKeyValidated] = useState(false);
-  const [keyMsg, setKeyMsg] = useState('');
+  const [enteredKey, setEnteredKey] = useState(initialAccessKey || '');
+  const [keyValidated, setKeyValidated] = useState(!!initialAccessKey);
+  const [keyMsg, setKeyMsg] = useState(initialAccessKey ? '✓ ACCESS KEY VERIFIED — DOCUMENTS UNLOCKED' : '');
 
   useEffect(() => {
     if (shipment && shipment.id != null) {
@@ -137,12 +137,12 @@ const ShipmentDetail = ({ shipment, history, readOnly = false }) => {
   const currentStatusColor = getStatusColor(shipment.status);
   const isDelivered = Number(shipment.status) === 3;
 
-  const isSenderOrReceiver = account && (
+  const isSenderOrReceiver = (account && (
     shipment.sender.toLowerCase() === account.toLowerCase() || 
     shipment.receiver.toLowerCase() === account.toLowerCase()
-  );
+  )) || (readOnly && keyValidated);
 
-  const isReceiver = account && shipment.receiver.toLowerCase() === account.toLowerCase();
+  const isReceiver = (account && shipment.receiver.toLowerCase() === account.toLowerCase()) || (readOnly && keyValidated);
 
   const handleAdvanceStatus = async () => {
     if (!account) return;

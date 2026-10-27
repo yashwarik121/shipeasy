@@ -156,7 +156,12 @@ const Verify = () => {
 
       {isVerified && shipment && (
         <div>
-          <ShipmentDetail shipment={shipment} history={history} readOnly={true} />
+          <ShipmentDetail 
+            shipment={shipment} 
+            history={history} 
+            readOnly={true} 
+            initialAccessKey={accessKeyInput.trim()} 
+          />
         </div>
       )}
 
