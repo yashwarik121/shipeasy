@@ -252,11 +252,20 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
       </div>
 
       {/* ATTACHED DOCUMENTS */}
-      {documents.length > 0 && (
-        <>
-          <div style={{ borderBottom: '4px solid var(--ink)', margin: '32px -32px 32px -32px' }}></div>
-          <h2 className="section-label mb-4">ATTACHED DOCUMENTS</h2>
+      <div style={{ borderBottom: '4px solid var(--ink)', margin: '32px -32px 32px -32px' }}></div>
+      <h2 className="section-label mb-4">ATTACHED DOCUMENTS</h2>
 
+      {documents.length === 0 ? (
+        <div style={{ border: '2px dashed var(--border-light)', padding: '24px', textAlign: 'center', background: 'var(--paper-dark)' }}>
+          <div className="font-mono text-xs text-steel">
+            NO DOCUMENTS ATTACHED TO THIS SHIPMENT RECORD
+          </div>
+          <div className="font-mono text-xs text-steel mt-1">
+            Documents (e.g. proof-of-delivery, bill of lading) can be attached by the Sender at shipment creation.
+          </div>
+        </div>
+      ) : (
+        <>
           {!isReceiver ? (
             <div style={{ border: '2px dashed var(--steel)', padding: '20px', textAlign: 'center', background: 'var(--paper-dark)' }}>
               <div className="font-mono text-xs font-bold text-steel mb-1">
@@ -268,29 +277,31 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
             </div>
           ) : (
             <>
-              {/* Access Key Input for Receiver */}
-              <div style={{ border: '2px solid var(--ink)', padding: '16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <span className="font-mono text-xs" style={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>🔑 RECEIVER ACCESS KEY:</span>
-                <input
-                  type="text"
-                  value={enteredKey}
-                  onChange={(e) => { setEnteredKey(e.target.value); setKeyValidated(false); setKeyMsg(''); }}
-                  placeholder="Enter secret access key to unlock document download..."
-                  className="font-mono"
-                  style={{
-                    flex: 1, padding: '8px 12px', border: '2px solid var(--steel)',
-                    background: 'transparent', fontSize: '12px', borderRadius: 0,
-                    color: 'var(--ink)'
-                  }}
-                />
-                <button
-                  className="btn font-mono"
-                  style={{ padding: '8px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}
-                  onClick={handleValidateKey}
-                >
-                  VALIDATE
-                </button>
-              </div>
+              {/* Access Key Input for Receiver (only if not already verified via prop) */}
+              {!keyValidated && (
+                <div style={{ border: '2px solid var(--ink)', padding: '16px', marginBottom: '16px', display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  <span className="font-mono text-xs" style={{ whiteSpace: 'nowrap', fontWeight: 'bold' }}>🔑 RECEIVER ACCESS KEY:</span>
+                  <input
+                    type="text"
+                    value={enteredKey}
+                    onChange={(e) => { setEnteredKey(e.target.value); setKeyValidated(false); setKeyMsg(''); }}
+                    placeholder="Enter secret access key to unlock document download..."
+                    className="font-mono"
+                    style={{
+                      flex: 1, padding: '8px 12px', border: '2px solid var(--steel)',
+                      background: 'transparent', fontSize: '12px', borderRadius: 0,
+                      color: 'var(--ink)'
+                    }}
+                  />
+                  <button
+                    className="btn font-mono"
+                    style={{ padding: '8px 16px', fontSize: '12px', whiteSpace: 'nowrap' }}
+                    onClick={handleValidateKey}
+                  >
+                    VALIDATE
+                  </button>
+                </div>
+              )}
               {keyMsg && (
                 <div className="font-mono text-xs mb-4" style={{ color: keyValidated ? 'var(--verified-green)' : 'var(--seal-red)', fontWeight: 'bold' }}>
                   {keyMsg}
