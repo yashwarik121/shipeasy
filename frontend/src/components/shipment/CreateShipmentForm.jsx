@@ -60,14 +60,31 @@ const CreateShipmentForm = () => {
       setProgress(p => [...p, 'CREATING SHIPMENT ON-CHAIN...']);
       const receipt = await createShipment(carrier, receiver, description);
       
-      let shipmentId;
-      try {
-        const res = await fetch('http://localhost:3001/api/shipments');
-        const data = await res.json();
-        shipmentId = data.length - 1;
-      } catch (err) {
-        console.error('Failed to fetch shipment ID', err);
-        throw new Error('Failed to retrieve shipment ID after creation');
+      // Extract the exact created shipment ID from the transaction receipt logs
+      let shipmentId = null;
+      if (receipt && receipt.logs) {
+        for (const log of receipt.logs) {
+          try {
+            // ShipmentCreated topic0 is the event signature; topic1 is the indexed id
+            if (log.topics && log.topics.length > 1) {
+              shipmentId = Number(BigInt(log.topics[1]));
+              break;
+            }
+          } catch (e) {
+            console.warn('Could not parse log topic', e);
+          }
+        }
+      }
+
+      // Fallback: query on-chain count
+      if (shipmentId === null || isNaN(shipmentId)) {
+        try {
+          const res = await fetch('http://localhost:3001/api/shipments');
+          const data = await res.json();
+          shipmentId = data.length; // The new one is at the current count
+        } catch (err) {
+          console.error('Failed to retrieve shipment ID', err);
+        }
       }
 
       if (files.length > 0) {
