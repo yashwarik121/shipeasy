@@ -53,7 +53,20 @@ router.post('/shipments/:id/documents', upload.single('file'), async (req, res) 
     }
 
     const cache = req.app.locals.cache;
-    const shipment = cache.getShipment(shipmentId);
+    const blockchain = req.app.locals.blockchain;
+    let shipment = cache.getShipment(shipmentId);
+
+    // If cache hasn't synced the new shipment yet, pull directly from chain
+    if (!shipment && blockchain && blockchain.contract) {
+      try {
+        const chainShipment = await blockchain.getShipment(shipmentId);
+        const chainHistory = await blockchain.getHistory(shipmentId);
+        cache.syncShipmentFromChain(shipmentId, chainShipment, chainHistory);
+        shipment = cache.getShipment(shipmentId);
+      } catch (err) {
+        console.warn('Could not sync shipment directly from chain:', err.message);
+      }
+    }
 
     if (!shipment) {
       fs.unlinkSync(file.path);

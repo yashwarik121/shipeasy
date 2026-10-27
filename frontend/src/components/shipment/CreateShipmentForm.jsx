@@ -118,7 +118,8 @@ const CreateShipmentForm = () => {
           });
 
           if (!uploadRes.ok) {
-            throw new Error(`Failed to upload ${file.name}`);
+            const errData = await uploadRes.json().catch(() => ({}));
+            throw new Error(errData.error || `Failed to upload ${file.name} (status ${uploadRes.status})`);
           }
         }
         setProgress(p => [...p, '✓ ALL FILES UPLOADED']);
