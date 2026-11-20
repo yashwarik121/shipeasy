@@ -63,6 +63,12 @@ async function startServer() {
       console.warn("No contract address configured, skipping blockchain sync.");
     }
 
+    // Global Express error handler
+    app.use((err, req, res, next) => {
+      console.error("Unhandled API error:", err);
+      res.status(err.status || 500).json({ error: err.message || 'Internal server error' });
+    });
+
     app.listen(config.port, () => {
       console.log(`Server running on port ${config.port}`);
     });

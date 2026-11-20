@@ -125,9 +125,13 @@ const CreateShipmentForm = () => {
              return newP;
           });
 
+          const uploaderAddress = account || (selectedAccount && selectedAccount.address) || '';
           const formData = new FormData();
           formData.append('file', file);
-          formData.append('address', account);
+          formData.append('address', uploaderAddress);
+          if (hash) {
+            formData.append('fileHash', hash);
+          }
 
           const uploadRes = await fetch(`${API_BASE_URL}/api/shipments/${shipmentId}/documents`, {
             method: 'POST',
@@ -135,8 +139,15 @@ const CreateShipmentForm = () => {
           });
 
           if (!uploadRes.ok) {
-            const errData = await uploadRes.json().catch(() => ({}));
-            throw new Error(errData.error || `Failed to upload ${file.name} (status ${uploadRes.status})`);
+            let errorMsg = `Failed to upload ${file.name} (status ${uploadRes.status})`;
+            try {
+              const errData = await uploadRes.json();
+              if (errData && errData.error) errorMsg = errData.error;
+            } catch (e) {
+              const textErr = await uploadRes.text().catch(() => '');
+              if (textErr) errorMsg = textErr.slice(0, 120);
+            }
+            throw new Error(errorMsg);
           }
         }
         setProgress(p => [...p, '✓ ALL FILES UPLOADED']);

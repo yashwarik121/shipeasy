@@ -8,7 +8,7 @@ const router = express.Router();
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const shipmentId = req.params.id;
+    const shipmentId = String(req.params.id);
     const dir = path.join(__dirname, '../../data/uploads', shipmentId);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
@@ -17,39 +17,60 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + '-' + file.originalname);
+    // Sanitize filename to avoid filesystem issues
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._\- ()]/g, '_');
+    cb(null, uniqueSuffix + '-' + safeName);
   }
 });
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
 });
 
 function computeFileHash(filePath) {
-  return new Promise((resolve, reject) => {
-    const hash = crypto.createHash('sha256');
-    const stream = fs.createReadStream(filePath);
-    stream.on('error', err => reject(err));
-    stream.on('data', chunk => hash.update(chunk));
-    stream.on('end', () => resolve('0x' + hash.digest('hex')));
-  });
+  try {
+    const buffer = fs.readFileSync(filePath);
+    const hash = crypto.createHash('sha256').update(buffer).digest('hex');
+    return '0x' + hash;
+  } catch (err) {
+    return new Promise((resolve, reject) => {
+      const hash = crypto.createHash('sha256');
+      const stream = fs.createReadStream(filePath);
+      stream.on('error', reject);
+      stream.on('data', chunk => hash.update(chunk));
+      stream.on('end', () => resolve('0x' + hash.digest('hex')));
+    });
+  }
 }
 
 // POST /api/shipments/:id/documents
-router.post('/shipments/:id/documents', upload.single('file'), async (req, res) => {
+router.post('/shipments/:id/documents', (req, res, next) => {
+  upload.single('file')(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ error: 'File size exceeds maximum 50MB limit.' });
+        }
+        return res.status(400).json({ error: `File upload error: ${err.message}` });
+      }
+      return res.status(400).json({ error: `Upload error: ${err.message}` });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const shipmentId = Number(req.params.id);
-    const { address } = req.body;
+    if (isNaN(shipmentId)) {
+      if (req.file && fs.existsSync(req.file.path)) try { fs.unlinkSync(req.file.path); } catch (e) {}
+      return res.status(400).json({ error: 'Invalid shipment ID' });
+    }
+
+    const { address, accessKey } = req.body;
     const file = req.file;
 
     if (!file) {
       return res.status(400).json({ error: 'No file uploaded' });
-    }
-    if (!address) {
-      // Remove uploaded file since we reject
-      fs.unlinkSync(file.path);
-      return res.status(400).json({ error: 'Uploader address is required' });
     }
 
     const cache = req.app.locals.cache;
@@ -69,14 +90,18 @@ router.post('/shipments/:id/documents', upload.single('file'), async (req, res) 
     }
 
     if (!shipment) {
-      fs.unlinkSync(file.path);
-      return res.status(404).json({ error: 'Shipment not found' });
+      if (fs.existsSync(file.path)) try { fs.unlinkSync(file.path); } catch (e) {}
+      return res.status(404).json({ error: `Shipment #${shipmentId} not found` });
     }
 
-    const addressLower = address.toLowerCase();
-    if (shipment.sender.toLowerCase() !== addressLower && shipment.receiver.toLowerCase() !== addressLower) {
-      fs.unlinkSync(file.path);
-      return res.status(403).json({ error: 'Only sender or receiver can upload documents' });
+    const addressLower = (address || '').trim().toLowerCase();
+    const isSender = shipment.sender && shipment.sender.toLowerCase() === addressLower;
+    const isReceiver = shipment.receiver && shipment.receiver.toLowerCase() === addressLower;
+    const hasValidKey = accessKey && shipment.accessKey === accessKey;
+
+    if (!isSender && !isReceiver && !hasValidKey) {
+      if (fs.existsSync(file.path)) try { fs.unlinkSync(file.path); } catch (e) {}
+      return res.status(403).json({ error: 'Only authorized sender or receiver can upload documents' });
     }
 
     const fileHash = await computeFileHash(file.path);
@@ -87,8 +112,8 @@ router.post('/shipments/:id/documents', upload.single('file'), async (req, res) 
       fileName: file.originalname,
       filePath: file.path,
       fileSize: file.size,
-      mimeType: file.mimetype,
-      uploader: address,
+      mimeType: file.mimetype || 'application/octet-stream',
+      uploader: address || shipment.sender,
       uploadedAt: Math.floor(Date.now() / 1000)
     };
 
@@ -104,9 +129,9 @@ router.post('/shipments/:id/documents', upload.single('file'), async (req, res) 
   } catch (error) {
     console.error('Error uploading document:', error);
     if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
+      try { fs.unlinkSync(req.file.path); } catch (e) {}
     }
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error during document processing' });
   }
 });
 
@@ -136,7 +161,7 @@ router.get('/shipments/:id/documents', (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error getting documents:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
@@ -181,7 +206,7 @@ router.get('/shipments/:id/documents/:docId/download', (req, res) => {
     fileStream.pipe(res);
   } catch (error) {
     console.error('Error downloading document:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
@@ -211,7 +236,7 @@ router.get('/shipments/:id/documents/:docId/verify', async (req, res) => {
     });
   } catch (error) {
     console.error('Error verifying document:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message || 'Internal server error' });
   }
 });
 
