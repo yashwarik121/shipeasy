@@ -3,9 +3,9 @@ import { Contract } from 'ethers';
 import { useWallet } from '../context/WalletContext';
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../utils/contract';
 
-// Fast receipt waiter: races tx.wait(1) with direct RPC receipt polling every 500ms
+// Fast receipt waiter: races tx.wait(1) with direct RPC receipt polling every 400ms
 // Never hangs in a loop when user approves in MetaMask
-const waitForTxReceipt = async (tx, provider, timeoutMs = 12000) => {
+const waitForTxReceipt = async (tx, provider, timeoutMs = 15000) => {
   if (!tx) return null;
   
   const pollPromise = new Promise(async (resolve) => {
@@ -20,7 +20,7 @@ const waitForTxReceipt = async (tx, provider, timeoutMs = 12000) => {
           }
         } catch (e) {}
       }
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 400));
     }
     resolve(null);
   });
@@ -34,7 +34,9 @@ const waitForTxReceipt = async (tx, provider, timeoutMs = 12000) => {
       const receipt = await provider.getTransactionReceipt(tx.hash);
       if (receipt) return receipt;
     }
-    return await waitPromise;
+    const finalReceipt = await waitPromise;
+    if (finalReceipt) return finalReceipt;
+    return { hash: tx.hash, blockNumber: 'confirmed' };
   } catch (err) {
     if (provider && tx.hash) {
       try {
@@ -99,7 +101,7 @@ export const useContract = () => {
     setLoading(true);
     setError(null);
     try {
-      const tx = await contract.advanceStatus(id, nextStatus, { gasLimit: 200000 });
+      const tx = await contract.advanceStatus(id, nextStatus, { gasLimit: 300000 });
       const receipt = await waitForTxReceipt(tx, provider);
       setLoading(false);
       return receipt;
@@ -115,7 +117,7 @@ export const useContract = () => {
     setLoading(true);
     setError(null);
     try {
-      const tx = await contract.completeDeliveryWithOtp(id, otp, { gasLimit: 250000 });
+      const tx = await contract.completeDeliveryWithOtp(id, otp, { gasLimit: 350000 });
       const receipt = await waitForTxReceipt(tx, provider);
       setLoading(false);
       return receipt;

@@ -19,18 +19,21 @@ router.get('/health', async (req, res) => {
 router.get('/shipments', async (req, res) => {
   try {
     const { cache, blockchain } = req.app.locals;
-    let shipments = cache.getAllShipments();
     
-    if (shipments.length === 0 && blockchain.contract) {
-      const count = await blockchain.getShipmentCount();
-      for (let i = 0; i < count; i++) {
-        const shipment = await blockchain.getShipment(i);
-        const history = await blockchain.getHistory(i);
-        cache.syncShipmentFromChain(i, shipment, history);
-      }
-      shipments = cache.getAllShipments();
+    if (blockchain && blockchain.contract) {
+      try {
+        const count = await blockchain.getShipmentCount();
+        for (let i = 0; i < count; i++) {
+          try {
+            const shipment = await blockchain.getShipment(i);
+            const history = await blockchain.getHistory(i);
+            cache.syncShipmentFromChain(i, shipment, history);
+          } catch (syncErr) {}
+        }
+      } catch (countErr) {}
     }
     
+    const shipments = cache.getAllShipments();
     res.json(shipments);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -43,17 +46,18 @@ router.get('/shipments/:id', async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid shipment ID" });
     
-    let shipment = cache.getShipment(id);
-    if (!shipment && blockchain.contract) {
+    // Always sync with live on-chain state if blockchain contract is active
+    if (blockchain && blockchain.contract) {
       try {
-        shipment = await blockchain.getShipment(id);
-        const history = await blockchain.getHistory(id);
-        cache.syncShipmentFromChain(id, shipment, history);
-      } catch (e) {
-        return res.status(404).json({ error: "Shipment not found" });
+        const chainShipment = await blockchain.getShipment(id);
+        const chainHistory = await blockchain.getHistory(id);
+        cache.syncShipmentFromChain(id, chainShipment, chainHistory);
+      } catch (chainErr) {
+        // Fall back gracefully to cache if chain query fails
       }
     }
     
+    let shipment = cache.getShipment(id);
     if (!shipment) {
       return res.status(404).json({ error: "Shipment not found" });
     }
@@ -123,18 +127,18 @@ router.get('/shipments/:id/history', async (req, res) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) return res.status(400).json({ error: "Invalid shipment ID" });
     
-    let history = cache.getHistory(id);
-    if (history.length === 0 && blockchain.contract) {
+    // Always sync with live on-chain history if blockchain contract is active
+    if (blockchain && blockchain.contract) {
       try {
-        const shipment = await blockchain.getShipment(id);
+        const chainShipment = await blockchain.getShipment(id);
         const chainHistory = await blockchain.getHistory(id);
-        cache.syncShipmentFromChain(id, shipment, chainHistory);
-        history = cache.getHistory(id);
-      } catch (e) {
-        return res.status(404).json({ error: "History not found" });
+        cache.syncShipmentFromChain(id, chainShipment, chainHistory);
+      } catch (chainErr) {
+        // Fall back gracefully to cached history
       }
     }
     
+    let history = cache.getHistory(id);
     res.json(history);
   } catch (error) {
     res.status(500).json({ error: error.message });

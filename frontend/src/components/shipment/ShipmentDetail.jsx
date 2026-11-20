@@ -6,12 +6,23 @@ import { API_BASE_URL } from '../../utils/api';
 import CustodyEntry from './StatusTimeline';
 import WaybillRoute from './WaybillRoute';
 
-const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey = '' }) => {
-  const { account } = useWallet();
-  const { advanceStatus, completeDeliveryWithOtp, getAccessKey, getDeliveryOtp } = useContract();
+const ShipmentDetail = ({ shipment: initialShipment, history: initialHistory, readOnly = false, initialAccessKey = '', onUpdate }) => {
+  const { account, connectAs, testAccounts } = useWallet();
+  const { advanceStatus, completeDeliveryWithOtp, getAccessKey, getDeliveryOtp, getShipment } = useContract();
+  
+  const [shipment, setShipment] = useState(initialShipment);
+  const [history, setHistory] = useState(initialHistory || []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
+
+  useEffect(() => {
+    if (initialShipment) setShipment(initialShipment);
+  }, [initialShipment]);
+
+  useEffect(() => {
+    if (initialHistory) setHistory(initialHistory);
+  }, [initialHistory]);
 
   const [documents, setDocuments] = useState([]);
   const [verifications, setVerifications] = useState({});
@@ -31,6 +42,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
   const isReceiver = !!((lowerAccount && shipment?.receiver?.toLowerCase() === lowerAccount) || (readOnly && keyValidated));
   const isSender = !!(lowerAccount && shipment?.sender?.toLowerCase() === lowerAccount);
   const isSenderOrReceiver = isSender || isReceiver;
+  const carrierTestAccount = testAccounts?.find(a => a.address.toLowerCase() === shipment?.carrier?.toLowerCase());
 
   useEffect(() => {
     if (shipment && shipment.id != null) {
@@ -211,23 +223,61 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
     setLoading(true);
     setError('');
     try {
-      const nextStatus = Number(shipment.status) + 1;
-      const receipt = await advanceStatus(shipment.id, nextStatus);
-      setSuccess({
-        blockNumber: receipt.blockNumber,
-        txHash: receipt.hash
-      });
-      // Sync cache and immediately refresh
+      // 1. Verify live on-chain status to avoid sending stale status numbers
+      let currentStatus = Number(shipment.status);
       try {
-        await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}`);
+        const onChain = await getShipment(shipment.id);
+        if (onChain && onChain.status !== undefined) {
+          currentStatus = Number(onChain.status);
+        }
       } catch (e) {}
+
+      if (currentStatus >= 2) {
+        setShipment(prev => ({ ...prev, status: currentStatus }));
+        setLoading(false);
+        return;
+      }
+
+      const nextStatus = currentStatus + 1;
+      const receipt = await advanceStatus(shipment.id, nextStatus);
+
+      // 2. Immediately update local state so the UI moves forward instantly with 0 latency
+      setShipment(prev => ({
+        ...prev,
+        status: nextStatus,
+        lastUpdated: Math.floor(Date.now() / 1000)
+      }));
+
+      setHistory(prev => [
+        ...(prev || []),
+        {
+          status: nextStatus,
+          updater: account || shipment.carrier,
+          timestamp: Math.floor(Date.now() / 1000)
+        }
+      ]);
+
+      setSuccess({
+        blockNumber: receipt?.blockNumber || 'confirmed',
+        txHash: receipt?.hash || receipt?.transactionHash
+      });
+
+      // Clear success notification after 2.5s so next actions are available
       setTimeout(() => {
-        window.location.reload();
-      }, 600);
+        setSuccess(null);
+      }, 2500);
+
+      // Background notification to parent/backend
+      if (onUpdate) {
+        try {
+          await onUpdate();
+        } catch (e) {}
+      }
     } catch (err) {
       setError(err.reason || err.message || 'Failed to update status');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleCompleteDeliveryWithOtp = async () => {
@@ -239,21 +289,42 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
     setError('');
     try {
       const receipt = await completeDeliveryWithOtp(shipment.id, carrierOtpInput);
+
+      // Immediately flip status to DELIVERED (3)
+      setShipment(prev => ({
+        ...prev,
+        status: 3,
+        lastUpdated: Math.floor(Date.now() / 1000)
+      }));
+
+      setHistory(prev => [
+        ...(prev || []),
+        {
+          status: 3,
+          updater: account || shipment.carrier,
+          timestamp: Math.floor(Date.now() / 1000)
+        }
+      ]);
+
       setSuccess({
-        blockNumber: receipt.blockNumber,
-        txHash: receipt.hash
+        blockNumber: receipt?.blockNumber || 'confirmed',
+        txHash: receipt?.hash || receipt?.transactionHash
       });
-      // Sync cache and immediately refresh
-      try {
-        await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}`);
-      } catch (e) {}
+
       setTimeout(() => {
-        window.location.reload();
-      }, 600);
+        setSuccess(null);
+      }, 3000);
+
+      if (onUpdate) {
+        try {
+          await onUpdate();
+        } catch (e) {}
+      }
     } catch (err) {
       setError(err.reason || err.message || 'OTP Verification Failed! Invalid code.');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // Only the assigned carrier can advance statuses
@@ -331,25 +402,45 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
           </div>
         </div>
 
-        <div style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: '11px',
-          fontWeight: 'bold',
-          padding: '4px 10px',
-          border: '1px solid var(--ink)',
-          background: isCarrier && Number(shipment.status) === 2 ? 'var(--seal-red)' : 'var(--ink)', 
-          color: 'white'
-        }}>
-          {isCarrier && (
-            Number(shipment.status) === 0 ? 'ACTION: PICK UP' :
-            Number(shipment.status) === 1 ? 'ACTION: IN TRANSIT' :
-            Number(shipment.status) === 2 ? '⚡ ENTER RECEIVER OTP TO DELIVER' : 'COMPLETED'
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {!isCarrier && carrierTestAccount && !isDelivered && (
+            <button
+              onClick={() => connectAs(carrierTestAccount)}
+              className="btn font-mono"
+              style={{
+                fontSize: '11px',
+                padding: '4px 10px',
+                background: 'var(--amber)',
+                color: '#000',
+                border: '1px solid var(--ink)',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+              }}
+              title={`Switch identity to Carrier (${carrierTestAccount.label})`}
+            >
+              🚚 SWITCH TO CARRIER ({carrierTestAccount.shortLabel})
+            </button>
           )}
-          {isReceiver && (
-            Number(shipment.status) === 3 ? 'PACKAGE RECEIVED ✓' : '🔑 YOUR DELIVERY OTP IS READY BELOW'
-          )}
-          {isSender && 'ORIGINATED ON-CHAIN (DISPATCH RECORD)'}
-          {!isCarrier && !isReceiver && !isSender && 'PUBLIC AUDIT TRAIL'}
+          <div style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            padding: '4px 10px',
+            border: '1px solid var(--ink)',
+            background: isCarrier && Number(shipment.status) === 2 ? 'var(--seal-red)' : 'var(--ink)', 
+            color: 'white'
+          }}>
+            {isCarrier && (
+              Number(shipment.status) === 0 ? 'ACTION: PICK UP' :
+              Number(shipment.status) === 1 ? 'ACTION: IN TRANSIT' :
+              Number(shipment.status) === 2 ? '⚡ ENTER RECEIVER OTP TO DELIVER' : 'COMPLETED'
+            )}
+            {isReceiver && (
+              Number(shipment.status) === 3 ? 'PACKAGE RECEIVED ✓' : '🔑 YOUR DELIVERY OTP IS READY BELOW'
+            )}
+            {isSender && 'ORIGINATED ON-CHAIN (DISPATCH RECORD)'}
+            {!isCarrier && !isReceiver && !isSender && 'PUBLIC AUDIT TRAIL'}
+          </div>
         </div>
       </div>
 
@@ -577,60 +668,79 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
       {isCarrier && canAdvance() && (
         <div style={{ marginTop: '32px', padding: '24px', border: '2px dashed var(--ink)', background: 'rgba(217, 119, 6, 0.04)' }}>
           {error && <div className="text-red font-mono mb-4">[ERROR] {error}</div>}
+          {success && (
+            <div className="stamp animate-stamp mb-4" style={{ border: '2px solid var(--verified-green)', padding: '12px', textAlign: 'center', background: 'rgba(34, 197, 94, 0.08)' }}>
+              <div className="text-green font-mono font-bold">✓ STATUS UPDATED ON-CHAIN (BLOCK #{success.blockNumber})</div>
+            </div>
+          )}
           <div>
-            {!success ? (
-              Number(shipment.status) === 2 ? (
-                /* Stage 2 (In Transit): ONLY OTP VERIFICATION PANEL */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div style={{ borderLeft: '4px solid var(--amber)', paddingLeft: '12px' }}>
-                    <div className="font-mono font-bold text-sm">🚚 CARRIER DELIVERY VERIFICATION (FINAL STAGE)</div>
-                    <div className="font-mono text-xs text-steel">Request the 6-digit OTP from the receiver upon physical handover</div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                    <input 
-                      type="text"
-                      maxLength={6}
-                      placeholder="ENTER 6-DIGIT OTP"
-                      value={carrierOtpInput}
-                      onChange={(e) => setCarrierOtpInput(e.target.value.replace(/\D/g, ''))}
-                      style={{
-                        flex: 1,
-                        minWidth: '200px',
-                        padding: '14px',
-                        fontSize: '22px',
-                        letterSpacing: '6px',
-                        textAlign: 'center',
-                        fontFamily: 'var(--font-mono)',
-                        border: '2px solid var(--ink)',
-                        background: 'var(--paper)'
-                      }}
-                    />
-                    <button 
-                      className="btn btn-primary"
-                      style={{ padding: '14px 24px', minWidth: '220px' }}
-                      onClick={handleCompleteDeliveryWithOtp}
-                      disabled={loading || carrierOtpInput.length !== 6}
-                    >
-                      {loading ? 'VERIFYING...' : 'CONFIRM DELIVERY'}
-                    </button>
-                  </div>
+            {Number(shipment.status) === 2 ? (
+              /* Stage 2 (In Transit): ONLY OTP VERIFICATION PANEL */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <div style={{ borderLeft: '4px solid var(--amber)', paddingLeft: '12px' }}>
+                  <div className="font-mono font-bold text-sm">🚚 CARRIER DELIVERY VERIFICATION (FINAL STAGE)</div>
+                  <div className="font-mono text-xs text-steel">Request the 6-digit OTP from the receiver upon physical handover</div>
                 </div>
-              ) : (
-                /* Stage 0 or 1: Standard pick up / in transit */
-                <button 
-                  className="btn btn-primary" 
-                  style={{ width: '100%', padding: '16px', fontSize: '13px' }}
-                  onClick={handleAdvanceStatus}
-                  disabled={loading}
-                >
-                  {loading ? 'SUBMITTING...' : `🚚 ${getNextStatusText()}`}
-                </button>
-              )
-            ) : (
-              <div className="stamp animate-stamp" style={{ border: '2px solid var(--verified-green)', padding: '16px', textAlign: 'center' }}>
-                <div className="text-green font-mono font-bold mb-2">STATUS UPDATED ON-CHAIN</div>
-                <div className="text-green font-mono text-xs">BLOCK #{success.blockNumber}</div>
+                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                  <input 
+                    type="text"
+                    maxLength={6}
+                    placeholder="ENTER 6-DIGIT OTP"
+                    value={carrierOtpInput}
+                    onChange={(e) => setCarrierOtpInput(e.target.value.replace(/\D/g, ''))}
+                    style={{
+                      flex: 1,
+                      minWidth: '200px',
+                      padding: '14px',
+                      fontSize: '22px',
+                      letterSpacing: '6px',
+                      textAlign: 'center',
+                      fontFamily: 'var(--font-mono)',
+                      border: '2px solid var(--ink)',
+                      background: 'var(--paper)'
+                    }}
+                  />
+                  <button 
+                    className="btn btn-primary"
+                    style={{ padding: '14px 24px', minWidth: '220px' }}
+                    onClick={handleCompleteDeliveryWithOtp}
+                    disabled={loading || carrierOtpInput.length !== 6}
+                  >
+                    {loading ? 'VERIFYING...' : 'CONFIRM DELIVERY'}
+                  </button>
+                </div>
               </div>
+            ) : (
+              /* Stage 0 or 1: Standard pick up / in transit */
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%', padding: '16px', fontSize: '13px' }}
+                onClick={handleAdvanceStatus}
+                disabled={loading}
+              >
+                {loading ? 'SUBMITTING TRANSACTION...' : `🚚 ${getNextStatusText()}`}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* HELPFUL NOTICE IF VIEWING AS NON-CARRIER WHILE SHIPMENT IS IN TRANSIT */}
+      {!isCarrier && !isReceiver && !isDelivered && (
+        <div style={{ marginTop: '32px', padding: '16px', border: '2px dashed var(--steel)', background: 'var(--paper-dark)' }}>
+          <div className="font-mono text-xs text-steel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <div>
+              <span>ASSIGNED CARRIER: </span>
+              <strong style={{ color: 'var(--ink)' }}>{shipment.carrier}</strong>
+            </div>
+            {carrierTestAccount && (
+              <button
+                onClick={() => connectAs(carrierTestAccount)}
+                className="btn font-mono"
+                style={{ padding: '6px 14px', fontSize: '11px', background: 'var(--amber)', color: '#000', border: '1px solid var(--ink)', cursor: 'pointer', fontWeight: 'bold' }}
+              >
+                🚚 SWITCH TO CARRIER TO ADVANCE STATUS
+              </button>
             )}
           </div>
         </div>

@@ -5,6 +5,7 @@ const path = require('path');
 class BlockchainService {
   constructor(rpcUrl, contractAddress) {
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
+    this.provider.pollingInterval = 400;
     
     let abi;
     try {
