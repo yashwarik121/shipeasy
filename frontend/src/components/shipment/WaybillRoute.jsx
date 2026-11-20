@@ -1,8 +1,12 @@
 import React from 'react';
 import { formatTimestamp, truncateAddress } from '../../utils/format';
 
-const WaybillRoute = ({ shipment, history = [] }) => {
-  const currentStatus = Number(shipment.status);
+const WaybillRoute = ({ shipment, history = [], status, sender, carrier, receiver }) => {
+  const currentStatus = Number(shipment?.status ?? status ?? 0);
+  const senderAddr = shipment?.sender || sender || '';
+  const carrierAddr = shipment?.carrier || carrier || '';
+  const receiverAddr = shipment?.receiver || receiver || '';
+  const shipmentId = shipment?.id ?? '000';
 
   // Map history logs by status index
   const historyByStatus = {};
@@ -18,7 +22,7 @@ const WaybillRoute = ({ shipment, history = [] }) => {
       code: 'ORIGIN',
       title: 'BOOKING & DISPATCH INITIATED',
       actorRole: 'SENDER',
-      actorAddress: shipment.sender,
+      actorAddress: senderAddr,
       description: 'Shipment registered & cryptographic access key anchored on-chain.',
     },
     {
@@ -26,7 +30,7 @@ const WaybillRoute = ({ shipment, history = [] }) => {
       code: 'CARGO_IN',
       title: 'PHYSICAL CUSTODY ACQUIRED',
       actorRole: 'CARRIER',
-      actorAddress: shipment.carrier,
+      actorAddress: carrierAddr,
       description: 'Carrier confirmed package collection and physical possession at origin checkpoint.',
     },
     {
@@ -34,7 +38,7 @@ const WaybillRoute = ({ shipment, history = [] }) => {
       code: 'TRANSIT',
       title: 'LINE-HAUL IN-TRANSIT DISPATCH',
       actorRole: 'CARRIER',
-      actorAddress: shipment.carrier,
+      actorAddress: carrierAddr,
       description: 'Cargo verified in freight movement pipeline towards destination hub.',
     },
     {
@@ -42,7 +46,7 @@ const WaybillRoute = ({ shipment, history = [] }) => {
       code: 'FINAL_POD',
       title: 'PROOF OF DELIVERY SEALED',
       actorRole: 'RECEIVER',
-      actorAddress: shipment.receiver,
+      actorAddress: receiverAddr,
       description: 'Recipient verified cargo receipt. Smart contract locked; record permanently sealed.',
     }
   ];
@@ -68,7 +72,7 @@ const WaybillRoute = ({ shipment, history = [] }) => {
             WAYBILL ROUTE & CARRIER DISPATCH LOG
           </div>
           <div className="font-mono" style={{ fontSize: '13px', fontWeight: 'bold' }}>
-            MANIFEST REF: WB-{String(shipment.id).padStart(4, '0')}-EVM
+            MANIFEST REF: WB-{String(shipmentId).padStart(4, '0')}-EVM
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -98,11 +102,15 @@ const WaybillRoute = ({ shipment, history = [] }) => {
               }}>
                 {/* Node Box */}
                 <div style={{
-                  width: '24px',
-                  height: '24px',
+                  width: '28px',
+                  height: '28px',
                   border: '2px solid var(--ink)',
-                  background: isDone ? 'var(--ink)' : 'var(--paper)',
-                  color: isDone ? 'var(--paper)' : 'var(--steel)',
+                  background: isCurrent 
+                    ? 'var(--amber)' 
+                    : isDone 
+                      ? 'var(--verified-green)' 
+                      : 'var(--paper)',
+                  color: isDone ? 'white' : 'var(--ink)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -110,64 +118,85 @@ const WaybillRoute = ({ shipment, history = [] }) => {
                   fontSize: '11px',
                   fontWeight: 'bold',
                   zIndex: 2,
-                  boxShadow: isCurrent ? '0 0 0 3px var(--verified-green)' : 'none'
+                  boxShadow: isCurrent ? '2px 2px 0px var(--ink)' : 'none'
                 }}>
-                  {isDone ? '✓' : `0${m.stage + 1}`}
+                  {isDone && !isCurrent ? '✓' : `0${m.stage}`}
                 </div>
 
-                {/* Vertical Segment Line */}
+                {/* Vertical Line connecting nodes */}
                 {idx < milestones.length - 1 && (
                   <div style={{
-                    width: '2px',
+                    width: '3px',
                     flex: 1,
                     minHeight: '44px',
-                    background: isDone && currentStatus > m.stage ? 'var(--ink)' : 'var(--border-light)',
-                    margin: '4px 0'
+                    background: isDone && currentStatus > m.stage 
+                      ? 'var(--ink)' 
+                      : 'var(--steel)',
+                    opacity: isPending ? 0.35 : 1,
+                    margin: '2px 0'
                   }} />
                 )}
               </div>
 
-              {/* Right Column: Milestone Content */}
+              {/* Right Column: Stage Description & On-Chain Audit */}
               <div style={{
                 flex: 1,
-                paddingBottom: idx === milestones.length - 1 ? '0' : '20px',
+                paddingBottom: idx === milestones.length - 1 ? '0px' : '20px',
                 opacity: isPending ? 0.45 : 1
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '8px' }}>
-                  <div>
-                    <span className="font-mono text-xs" style={{
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span className="font-mono text-xs font-bold" style={{
+                    background: isCurrent ? 'var(--ink)' : isDone ? '#2563eb' : 'var(--steel)',
+                    color: 'white',
+                    padding: '1px 6px',
+                    fontSize: '10px'
+                  }}>
+                    {m.code}
+                  </span>
+                  <span className="font-mono font-bold" style={{ fontSize: '13px' }}>
+                    {m.title}
+                  </span>
+                  {isCurrent && (
+                    <span style={{
+                      fontSize: '10px',
+                      fontFamily: 'var(--font-mono)',
+                      color: 'var(--amber)',
                       fontWeight: 'bold',
-                      color: isDone ? 'var(--ink)' : 'var(--steel)',
-                      letterSpacing: '0.05em'
+                      border: '1px solid var(--amber)',
+                      padding: '1px 6px'
                     }}>
-                      [{m.code}] {m.title}
+                      LIVE AT THIS CHECKPOINT
                     </span>
-                    <span className="font-mono text-xs text-steel" style={{ marginLeft: '8px' }}>
-                      ({m.actorRole})
-                    </span>
-                  </div>
-
-                  {logEntry && logEntry.timestamp && (
-                    <div className="font-mono text-xs text-steel">
-                      {formatTimestamp(Number(logEntry.timestamp))}
-                    </div>
                   )}
                 </div>
 
-                <div className="font-mono text-xs text-steel" style={{ marginTop: '4px', lineHeight: '1.4' }}>
+                <div className="font-mono text-xs text-steel" style={{ margin: '4px 0 6px 0', lineHeight: '1.4' }}>
                   {m.description}
                 </div>
 
-                <div className="font-mono text-xs text-steel" style={{ marginTop: '4px' }}>
-                  KEY ACTOR: <span style={{ color: 'var(--ink)' }}>{truncateAddress(m.actorAddress)}</span>
-                  {isCurrent && (
-                    <span style={{
-                      marginLeft: '10px',
-                      color: 'var(--verified-green)',
-                      fontWeight: 'bold'
-                    }}>
-                      ◀ CURRENT CHECKPOINT
-                    </span>
+                {/* Signer & Proof Details */}
+                <div style={{
+                  display: 'flex',
+                  gap: '16px',
+                  alignItems: 'center',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '11px',
+                  color: 'var(--ink)',
+                  background: 'rgba(0,0,0,0.03)',
+                  padding: '6px 10px',
+                  border: '1px dashed var(--steel)',
+                  marginTop: '4px',
+                  flexWrap: 'wrap'
+                }}>
+                  <div>
+                    <span className="text-steel" style={{ fontSize: '10px' }}>PARTY: </span>
+                    <strong>{m.actorRole}</strong> ({truncateAddress(m.actorAddress)})
+                  </div>
+                  {logEntry && (
+                    <div>
+                      <span className="text-steel" style={{ fontSize: '10px' }}>SEALED: </span>
+                      <span>{formatTimestamp(logEntry.timestamp)}</span>
+                    </div>
                   )}
                 </div>
               </div>

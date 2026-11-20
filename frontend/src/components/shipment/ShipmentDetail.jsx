@@ -381,6 +381,8 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
 
       {/* VISUAL TRANSIT WAYBILL ROUTE */}
       <WaybillRoute 
+        shipment={shipment}
+        history={history || []}
         status={Number(shipment.status)} 
         sender={shipment.sender} 
         carrier={shipment.carrier} 
@@ -392,13 +394,18 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
       {/* CUSTODY AUDIT TIMELINE */}
       <h2 className="section-label mb-4">CUSTODY LEDGER AUDIT TRAIL</h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {history.map((entry, index) => (
-          <CustodyEntry 
-            key={index} 
-            entry={entry} 
-            isCurrent={index === history.length - 1} 
-          />
-        ))}
+        {(Array.isArray(history) && history.length > 0) ? (
+          history.map((entry, index) => (
+            <CustodyEntry 
+              key={index} 
+              entry={entry} 
+              index={index}
+              isCurrent={index === history.length - 1} 
+            />
+          ))
+        ) : (
+          <div className="font-mono text-xs text-steel">NO AUDIT ENTRIES FOUND</div>
+        )}
       </div>
 
       {/* PROOF-OF-DELIVERY OTP (STRICTLY SENDER & RECEIVER ONLY - CARRIER NEVER SEES THIS) */}
