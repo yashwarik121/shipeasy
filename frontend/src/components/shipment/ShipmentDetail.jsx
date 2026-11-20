@@ -36,7 +36,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
     if (shipment && shipment.id != null) {
       fetchDocuments();
     }
-  }, [shipment]);
+  }, [shipment?.id]);
 
   const fetchDocuments = async () => {
     try {
@@ -63,76 +63,75 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
     }
   };
 
-  // Auto-fetch Access Key for Receiver or Sender
-  const fetchAccessKey = useCallback(async () => {
-    if (isCarrier || !isSenderOrReceiver || !shipment?.id === undefined) return;
-    try {
-      let key = null;
-      try {
-        key = await getAccessKey(shipment.id);
-      } catch (e) {}
+  // Synchronize Access Key and Delivery OTP cleanly without circular dependency loops
+  useEffect(() => {
+    if (!shipment || shipment.id == null) return;
 
-      if (!key || key === '0x' || key === '0x0000000000000000000000000000000000000000000000000000000000000000') {
-        const res = await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.accessKey) {
-            key = data.accessKey;
-          }
-        }
+    if (isReceiver || isSender) {
+      setKeyValidated(true);
+      setKeyMsg('✓ IDENTIFIED AS AUTHORIZED PARTY — FULL RECORD UNLOCKED');
+
+      if (shipment.accessKey && shipment.accessKey !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+        setAccessKey(shipment.accessKey);
+        setEnteredKey(shipment.accessKey);
       }
 
-      if (key && key !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+      if (shipment.deliveryOtp) {
+        setDeliveryOtp(shipment.deliveryOtp);
+      } else {
+        const addrParam = account || (isReceiver ? shipment.receiver : shipment.sender);
+        fetch(`${API_BASE_URL}/api/shipments/${shipment.id}/otp?address=${addrParam}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data && data.otp) setDeliveryOtp(data.otp);
+          })
+          .catch(() => {});
+      }
+    }
+  }, [shipment?.id, account, isReceiver, isSender, shipment?.accessKey, shipment?.deliveryOtp]);
+
+  const handleRevealKey = async () => {
+    if (shipment?.accessKey) {
+      setAccessKey(shipment.accessKey);
+      setEnteredKey(shipment.accessKey);
+      return;
+    }
+    try {
+      const key = await getAccessKey(shipment.id);
+      if (key) {
         setAccessKey(key);
         setEnteredKey(key);
-        setKeyValidated(true);
       }
     } catch (err) {
-      console.warn('Could not auto-fetch access key:', err);
+      console.warn('Failed to reveal access key', err);
     }
-  }, [isCarrier, isSenderOrReceiver, shipment?.id, getAccessKey]);
+  };
 
-  // Auto-fetch Delivery OTP for Receiver or Sender
-  const fetchReceiverOtp = useCallback(async () => {
-    if (isCarrier || !isSenderOrReceiver || shipment?.id === undefined) return;
+  const fetchReceiverOtp = async () => {
+    if (shipment?.deliveryOtp) {
+      setDeliveryOtp(shipment.deliveryOtp);
+      return;
+    }
+    setOtpLoading(true);
+    setOtpError('');
     try {
-      setOtpLoading(true);
-      setOtpError('');
-      let otp = null;
-      try {
-        otp = await getDeliveryOtp(shipment.id);
-      } catch (e) {}
-
-      if (!otp) {
-        const addrParam = account || (isReceiver ? shipment.receiver : shipment.sender);
-        const res = await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}/otp?address=${addrParam}&accessKey=${enteredKey.trim()}`);
-        if (res.ok) {
-          const data = await res.json();
-          otp = data.otp;
+      const addrParam = account || (isReceiver ? shipment.receiver : shipment.sender);
+      const res = await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}/otp?address=${addrParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.otp) {
+          setDeliveryOtp(data.otp);
+          return;
         }
       }
-
-      if (otp) {
-        setDeliveryOtp(otp);
-      } else {
-        setOtpError('Delivery OTP is restricted to authorized receiver & sender');
-      }
+      const onChainOtp = await getDeliveryOtp(shipment.id);
+      if (onChainOtp) setDeliveryOtp(onChainOtp);
     } catch (err) {
       setOtpError('Failed to retrieve delivery OTP');
     } finally {
       setOtpLoading(false);
     }
-  }, [isCarrier, isSenderOrReceiver, shipment?.id, getDeliveryOtp, account, isReceiver, enteredKey]);
-
-  // Trigger auto-unlock for Receiver and Sender on mount or identity switch
-  useEffect(() => {
-    if ((isReceiver || isSender) && !isCarrier && shipment?.id !== undefined) {
-      setKeyValidated(true);
-      setKeyMsg('✓ IDENTIFIED AS AUTHORIZED PARTY — FULL RECORD UNLOCKED');
-      if (!accessKey) fetchAccessKey();
-      if (!deliveryOtp) fetchReceiverOtp();
-    }
-  }, [isReceiver, isSender, isCarrier, shipment?.id, accessKey, deliveryOtp, fetchAccessKey, fetchReceiverOtp]);
+  };
 
   const handleValidateKey = async () => {
     if (!enteredKey.trim()) {
