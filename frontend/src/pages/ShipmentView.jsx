@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import ShipmentDetail from '../components/shipment/ShipmentDetail';
+import { API_BASE_URL } from '../utils/api';
 
 const ShipmentView = () => {
   const { id } = useParams();
@@ -12,12 +13,12 @@ const ShipmentView = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const shipRes = await fetch(`http://localhost:3001/api/shipments/${id}`);
+        const shipRes = await fetch(`${API_BASE_URL}/api/shipments/${id}`);
         if (!shipRes.ok) throw new Error('NOT FOUND');
         const shipData = await shipRes.json();
         setShipment(shipData);
 
-        const histRes = await fetch(`http://localhost:3001/api/shipments/${id}/history`);
+        const histRes = await fetch(`${API_BASE_URL}/api/shipments/${id}/history`);
         if (histRes.ok) {
           const histData = await histRes.json();
           setHistory(histData);

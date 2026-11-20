@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import ConnectWallet from '../wallet/ConnectWallet';
 import { useTheme } from '../../context/ThemeContext';
+import { API_BASE_URL } from '../../utils/api';
 
 const Header = () => {
   const location = useLocation();
@@ -13,7 +14,7 @@ const Header = () => {
   // Poll audit status for live navbar indicator
   useEffect(() => {
     const checkAudit = () => {
-      fetch('http://localhost:3001/api/tamper/audit')
+      fetch(`${API_BASE_URL}/api/tamper/audit`)
         .then(res => res.json())
         .then(data => {
           if (data && data.tamperDetected !== undefined) {

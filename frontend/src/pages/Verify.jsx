@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import ShipmentDetail from '../components/shipment/ShipmentDetail';
+import { API_BASE_URL } from '../utils/api';
 
 const Verify = () => {
   const [searchId, setSearchId] = useState('');
@@ -29,7 +30,7 @@ const Verify = () => {
       }
 
       // 1. Fetch shipment metadata from backend
-      const shipRes = await fetch(`http://localhost:3001/api/shipments/${numId}`);
+      const shipRes = await fetch(`${API_BASE_URL}/api/shipments/${numId}`);
       if (!shipRes.ok) throw new Error('No custody record found for this ID.');
       const shipData = await shipRes.json();
 
@@ -40,7 +41,7 @@ const Verify = () => {
       }
 
       // 3. Fetch history
-      const histRes = await fetch(`http://localhost:3001/api/shipments/${numId}/history`);
+      const histRes = await fetch(`${API_BASE_URL}/api/shipments/${numId}/history`);
       const histData = histRes.ok ? await histRes.json() : [];
 
       setShipment(shipData);

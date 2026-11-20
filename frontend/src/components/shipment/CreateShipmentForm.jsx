@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { keccak256, toUtf8Bytes } from 'ethers';
 import { useWallet } from '../../context/WalletContext';
 import { useContract } from '../../hooks/useContract';
+import { API_BASE_URL } from '../../utils/api';
 
 const CreateShipmentForm = () => {
   const [carrier, setCarrier] = useState('');
@@ -83,7 +84,7 @@ const CreateShipmentForm = () => {
       // Fallback: query on-chain count
       if (shipmentId === null || isNaN(shipmentId)) {
         try {
-          const res = await fetch('http://localhost:3001/api/shipments');
+          const res = await fetch(`${API_BASE_URL}/api/shipments`);
           const data = await res.json();
           shipmentId = data.length; // The new one is at the current count
         } catch (err) {
@@ -93,7 +94,7 @@ const CreateShipmentForm = () => {
 
       if (shipmentId !== null) {
         try {
-          await fetch(`http://localhost:3001/api/shipments/${shipmentId}/otp`, {
+          await fetch(`${API_BASE_URL}/api/shipments/${shipmentId}/otp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ otp: generatedOtp })
@@ -128,7 +129,7 @@ const CreateShipmentForm = () => {
           formData.append('file', file);
           formData.append('address', account);
 
-          const uploadRes = await fetch(`http://localhost:3001/api/shipments/${shipmentId}/documents`, {
+          const uploadRes = await fetch(`${API_BASE_URL}/api/shipments/${shipmentId}/documents`, {
             method: 'POST',
             body: formData,
           });

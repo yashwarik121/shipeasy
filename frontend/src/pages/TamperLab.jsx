@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../utils/api';
 
 const DEFAULT_SAMPLE_DOC = `INVOICE #98231
 CARRIER: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
@@ -23,7 +24,7 @@ export default function TamperLab() {
     setLoadingSim(true);
     try {
       const textToUse = customText !== undefined ? customText : docText;
-      const res = await fetch('http://localhost:3001/api/tamper/simulate', {
+      const res = await fetch(`${API_BASE_URL}/api/tamper/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: textToUse })
@@ -42,7 +43,7 @@ export default function TamperLab() {
     setAuditLoading(true);
     setActionMsg('');
     try {
-      const res = await fetch('http://localhost:3001/api/tamper/audit');
+      const res = await fetch(`${API_BASE_URL}/api/tamper/audit`);
       const data = await res.json();
       setAuditData(data);
     } catch (err) {
@@ -57,7 +58,7 @@ export default function TamperLab() {
     const forgedStatus = currentStatus === 3 ? 1 : 3;
     setActionMsg(`Injecting forged status (Stage ${forgedStatus}) into local database for Shipment #${id}...`);
     try {
-      const res = await fetch('http://localhost:3001/api/tamper/modify-cache', {
+      const res = await fetch(`${API_BASE_URL}/api/tamper/modify-cache`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shipmentId: id, tamperedStatus: forgedStatus })
@@ -74,7 +75,7 @@ export default function TamperLab() {
   const handleTamperFile = async (docId) => {
     setActionMsg(`Flipping 1 byte in disk file #${docId}...`);
     try {
-      const res = await fetch('http://localhost:3001/api/tamper/tamper-doc-file', {
+      const res = await fetch(`${API_BASE_URL}/api/tamper/tamper-doc-file`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ docId })
@@ -91,7 +92,7 @@ export default function TamperLab() {
   const handleRestoreCache = async () => {
     setActionMsg('Resyncing from blockchain smart contract...');
     try {
-      const res = await fetch('http://localhost:3001/api/tamper/restore-cache', {
+      const res = await fetch(`${API_BASE_URL}/api/tamper/restore-cache`, {
         method: 'POST'
       });
       const data = await res.json();

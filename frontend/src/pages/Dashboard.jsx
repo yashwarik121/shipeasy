@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useWallet } from '../context/WalletContext';
+import { API_BASE_URL } from '../utils/api';
 import ShipmentCard from '../components/shipment/ShipmentCard';
 import LiveEventFeed from '../components/feed/LiveEventFeed';
 
@@ -20,8 +21,8 @@ const Dashboard = () => {
     const fetchShipments = async () => {
       setLoading(true);
       try {
-        // Fetch from backend API — no MetaMask RPC calls needed
-        const res = await fetch('http://localhost:3001/api/shipments');
+        // Fetch from backend API
+        const res = await fetch(`${API_BASE_URL}/api/shipments`);
         if (res.ok) {
           const data = await res.json();
           const list = Array.isArray(data) ? data : (data.value || []);

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import { API_BASE_URL } from '../utils/api';
 
 const CRYPTO_SYMBOLS = ['₿', '⛓', '◈', '⬡', '⬢', '△', '⏣', '◉'];
 const FLOAT_COUNT = 18;
@@ -15,12 +16,12 @@ const Landing = () => {
   const heroRef = useRef(null);
 
   useEffect(() => {
-    fetch('http://localhost:3001/api/shipments')
+    fetch(`${API_BASE_URL}/api/shipments`)
       .then(r => r.json())
       .then(d => { setShipments(Array.isArray(d) ? d : []); setLoaded(true); })
       .catch(() => setLoaded(true));
 
-    fetch('http://localhost:3001/api/tamper/audit')
+    fetch(`${API_BASE_URL}/api/tamper/audit`)
       .then(r => r.json())
       .then(d => { if (d && d.tamperDetected) setTamperDetected(true); })
       .catch(() => {});

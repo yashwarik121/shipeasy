@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getExplorerAddressUrl, getStatusColor, getStatusText, formatTimestamp } from '../../utils/format';
 import { useWallet } from '../../context/WalletContext';
 import { useContract } from '../../hooks/useContract';
+import { API_BASE_URL } from '../../utils/api';
 import CustodyEntry from './StatusTimeline';
 import WaybillRoute from './WaybillRoute';
 
@@ -33,7 +34,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
 
   const fetchDocuments = async () => {
     try {
-      const res = await fetch(`http://localhost:3001/api/shipments/${shipment.id}/documents`);
+      const res = await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}/documents`);
       if (res.ok) {
         const docs = await res.json();
         setDocuments(docs);
@@ -46,7 +47,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
 
   const verifyDocument = async (docId) => {
     try {
-      const res = await fetch(`http://localhost:3001/api/shipments/${shipment.id}/documents/${docId}/verify`);
+      const res = await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}/documents/${docId}/verify`);
       if (res.ok) {
         const data = await res.json();
         setVerifications(prev => ({ ...prev, [docId]: data.verified }));
@@ -76,7 +77,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
     const addressToUse = account || shipment.receiver;
     try {
       const res = await fetch(
-        `http://localhost:3001/api/shipments/${shipment.id}/documents/${documents[0]?.id}/download?address=${addressToUse}&accessKey=${enteredKey.trim()}`,
+        `${API_BASE_URL}/api/shipments/${shipment.id}/documents/${documents[0]?.id}/download?address=${addressToUse}&accessKey=${enteredKey.trim()}`,
         { method: 'HEAD' }
       );
       if (res.ok || res.status === 200) {
@@ -94,7 +95,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
 
   const getFileUrl = (docId) => {
     const addressToUse = account || shipment.receiver;
-    return `http://localhost:3001/api/shipments/${shipment.id}/documents/${docId}/download?address=${addressToUse}&accessKey=${enteredKey.trim()}`;
+    return `${API_BASE_URL}/api/shipments/${shipment.id}/documents/${docId}/download?address=${addressToUse}&accessKey=${enteredKey.trim()}`;
   };
 
   const handleView = async (docId, filename) => {
@@ -161,7 +162,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
 
       if (!otp) {
         const addrParam = account || shipment.receiver;
-        const res = await fetch(`http://localhost:3001/api/shipments/${shipment.id}/otp?address=${addrParam}&accessKey=${enteredKey.trim()}`);
+        const res = await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}/otp?address=${addrParam}&accessKey=${enteredKey.trim()}`);
         if (res.ok) {
           const data = await res.json();
           otp = data.otp;
