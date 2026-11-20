@@ -147,8 +147,8 @@ router.get('/shipments/:id/documents/:docId/download', (req, res) => {
     const docId = Number(req.params.docId);
     const { address, accessKey } = req.query;
 
-    if (!address || !accessKey) {
-      return res.status(400).json({ error: 'address and accessKey are required' });
+    if (!address && !accessKey) {
+      return res.status(400).json({ error: 'address or accessKey is required' });
     }
 
     const cache = req.app.locals.cache;
@@ -158,13 +158,12 @@ router.get('/shipments/:id/documents/:docId/download', (req, res) => {
       return res.status(404).json({ error: 'Shipment not found' });
     }
 
-    const addressLower = address.toLowerCase();
-    if (shipment.sender.toLowerCase() !== addressLower && shipment.receiver.toLowerCase() !== addressLower) {
-      return res.status(403).json({ error: 'Access denied: not sender or receiver' });
-    }
+    const addressLower = (address || '').toLowerCase();
+    const isParty = addressLower && (shipment.sender.toLowerCase() === addressLower || shipment.receiver.toLowerCase() === addressLower);
+    const hasKey = accessKey && shipment.accessKey === accessKey;
 
-    if (shipment.accessKey !== accessKey) {
-      return res.status(403).json({ error: 'Access denied: invalid accessKey' });
+    if (!isParty && !hasKey) {
+      return res.status(403).json({ error: 'Access denied: must be sender, receiver, or provide valid accessKey' });
     }
 
     const doc = cache.getDocument(docId);

@@ -15,7 +15,7 @@ const CreateShipmentForm = () => {
   const [success, setSuccess] = useState(null);
   const [progress, setProgress] = useState([]);
   
-  const { account } = useWallet();
+  const { account, testAccounts } = useWallet();
   const { createShipmentWithOtp, addDocument } = useContract();
   const navigate = useNavigate();
 
@@ -173,7 +173,9 @@ const CreateShipmentForm = () => {
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
         
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>CARRIER ADDRESS</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>CARRIER ADDRESS</label>
+          </div>
           <input 
             type="text" 
             value={carrier}
@@ -191,10 +193,33 @@ const CreateShipmentForm = () => {
             }}
             disabled={loading || success}
           />
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+            <span style={{ fontSize: '10px', color: 'var(--steel)', fontFamily: 'var(--font-mono)', alignSelf: 'center' }}>QUICK SELECT:</span>
+            {testAccounts?.slice(0, 5).map(acc => (
+              <button
+                key={acc.address}
+                type="button"
+                onClick={() => setCarrier(acc.address)}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '10px',
+                  fontFamily: 'var(--font-mono)',
+                  border: '1px solid var(--ink)',
+                  background: carrier.toLowerCase() === acc.address.toLowerCase() ? 'var(--ink)' : 'transparent',
+                  color: carrier.toLowerCase() === acc.address.toLowerCase() ? 'white' : 'var(--ink)',
+                  cursor: 'pointer'
+                }}
+              >
+                {acc.shortLabel}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <label className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>RECEIVER ADDRESS</label>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <label className="section-label" style={{ borderBottom: 'none', marginBottom: 0, paddingBottom: 0 }}>RECEIVER ADDRESS</label>
+          </div>
           <input 
             type="text" 
             value={receiver}
@@ -212,6 +237,27 @@ const CreateShipmentForm = () => {
             }}
             disabled={loading || success}
           />
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '2px' }}>
+            <span style={{ fontSize: '10px', color: 'var(--steel)', fontFamily: 'var(--font-mono)', alignSelf: 'center' }}>QUICK SELECT:</span>
+            {testAccounts?.slice(0, 5).map(acc => (
+              <button
+                key={acc.address}
+                type="button"
+                onClick={() => setReceiver(acc.address)}
+                style={{
+                  padding: '3px 8px',
+                  fontSize: '10px',
+                  fontFamily: 'var(--font-mono)',
+                  border: '1px solid var(--ink)',
+                  background: receiver.toLowerCase() === acc.address.toLowerCase() ? 'var(--ink)' : 'transparent',
+                  color: receiver.toLowerCase() === acc.address.toLowerCase() ? 'white' : 'var(--ink)',
+                  cursor: 'pointer'
+                }}
+              >
+                {acc.shortLabel}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

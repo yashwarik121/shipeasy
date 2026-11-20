@@ -40,47 +40,67 @@ const Dashboard = () => {
 
   if (!account) return null;
 
+  const lowerAccount = account.toLowerCase();
+  const myShipments = shipments.filter(s => 
+    s.sender.toLowerCase() === lowerAccount || 
+    s.carrier.toLowerCase() === lowerAccount || 
+    s.receiver.toLowerCase() === lowerAccount
+  );
+  const carrierShipments = shipments.filter(s => s.carrier.toLowerCase() === lowerAccount);
+  const receiverShipments = shipments.filter(s => s.receiver.toLowerCase() === lowerAccount);
+  const senderShipments = shipments.filter(s => s.sender.toLowerCase() === lowerAccount);
+
   const filteredShipments = shipments.filter(s => {
-    const lowerAccount = account.toLowerCase();
     if (activeTab === 'ALL') return true;
-    if (activeTab === 'AS SENDER') return s.sender.toLowerCase() === lowerAccount;
+    if (activeTab === 'ASSIGNED TO ME') return s.sender.toLowerCase() === lowerAccount || s.carrier.toLowerCase() === lowerAccount || s.receiver.toLowerCase() === lowerAccount;
     if (activeTab === 'AS CARRIER') return s.carrier.toLowerCase() === lowerAccount;
     if (activeTab === 'AS RECEIVER') return s.receiver.toLowerCase() === lowerAccount;
+    if (activeTab === 'AS SENDER') return s.sender.toLowerCase() === lowerAccount;
     return true;
   });
 
-  const tabs = ['ALL', 'AS SENDER', 'AS CARRIER', 'AS RECEIVER'];
+  const tabOptions = [
+    { id: 'ALL', label: `ALL (${shipments.length})` },
+    { id: 'ASSIGNED TO ME', label: `ASSIGNED TO ME (${myShipments.length})` },
+    { id: 'AS CARRIER', label: `AS CARRIER (${carrierShipments.length})` },
+    { id: 'AS RECEIVER', label: `AS RECEIVER (${receiverShipments.length})` },
+    { id: 'AS SENDER', label: `AS SENDER (${senderShipments.length})` }
+  ];
 
   return (
     <div style={{ display: 'flex', gap: '48px', alignItems: 'flex-start' }}>
       
       {/* Main Column */}
       <div style={{ flex: 1 }}>
-        <div style={{ marginBottom: '40px' }}>
-          <h1 className="display-lg uppercase" style={{ margin: '0 0 8px 0' }}>CUSTODY RECORDS</h1>
-          <div className="chain-address font-mono" style={{ fontSize: '16px' }}>{account}</div>
+        <div style={{ marginBottom: '32px' }}>
+          <h1 className="display-lg uppercase" style={{ margin: '0 0 8px 0' }}>CUSTODY LEDGER</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--steel)' }}>LOGGED IN IDENTITY:</span>
+            <span className="chain-address font-mono" style={{ fontSize: '14px', fontWeight: 'bold' }}>{account}</span>
+          </div>
         </div>
 
         {/* Role Tabs */}
-        <div style={{ display: 'flex', gap: '32px', marginBottom: '32px', borderBottom: '1px solid var(--steel)' }}>
-          {tabs.map(tab => (
+        <div style={{ display: 'flex', gap: '24px', marginBottom: '28px', borderBottom: '2px solid var(--steel)', overflowX: 'auto' }}>
+          {tabOptions.map(tab => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
               style={{
                 background: 'none',
                 border: 'none',
-                borderBottom: activeTab === tab ? '3px solid var(--ink)' : '3px solid transparent',
-                padding: '0 0 12px 0',
-                margin: '0 0 -1px 0',
+                borderBottom: activeTab === tab.id ? '3px solid var(--ink)' : '3px solid transparent',
+                padding: '0 0 10px 0',
+                margin: '0 0 -2px 0',
                 fontFamily: 'var(--font-mono)',
-                fontWeight: 'bold',
-                fontSize: '14px',
-                color: 'var(--ink)',
-                cursor: 'pointer'
+                fontWeight: activeTab === tab.id ? 'bold' : 'normal',
+                fontSize: '13px',
+                color: activeTab === tab.id ? 'var(--ink)' : 'var(--steel)',
+                cursor: 'pointer',
+                whiteSpace: 'nowrap'
               }}
             >
-              {tab}
+              {tab.label}
             </button>
           ))}
         </div>

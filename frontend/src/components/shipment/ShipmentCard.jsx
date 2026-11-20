@@ -11,16 +11,36 @@ const ShipmentCard = ({ shipment }) => {
     navigate(`/shipment/${shipment.id}`);
   };
 
-  const getRole = () => {
+  const getRoleInfo = () => {
     if (!account) return null;
     const lowerAccount = account.toLowerCase();
-    if (shipment.sender.toLowerCase() === lowerAccount) return 'YOU: SENDER';
-    if (shipment.carrier.toLowerCase() === lowerAccount) return 'YOU: CARRIER';
-    if (shipment.receiver.toLowerCase() === lowerAccount) return 'YOU: RECEIVER';
+    const status = Number(shipment.status);
+
+    if (shipment.carrier.toLowerCase() === lowerAccount) {
+      let action = 'DELIVERED';
+      let color = 'var(--verified-green)';
+      let bg = 'rgba(34, 197, 94, 0.1)';
+      if (status === 0) { action = 'ACTION: PICK UP'; color = 'var(--amber)'; bg = 'rgba(217, 119, 6, 0.15)'; }
+      if (status === 1) { action = 'ACTION: IN TRANSIT'; color = '#2563eb'; bg = 'rgba(37, 99, 235, 0.15)'; }
+      if (status === 2) { action = '⚡ ENTER OTP'; color = 'var(--seal-red)'; bg = 'rgba(184, 51, 47, 0.15)'; }
+      return { label: 'YOU: CARRIER', action, color, bg };
+    }
+
+    if (shipment.receiver.toLowerCase() === lowerAccount) {
+      let action = status === 3 ? 'RECEIVED ✓' : '🔑 HOLDING OTP';
+      let color = status === 3 ? 'var(--verified-green)' : 'var(--amber)';
+      let bg = status === 3 ? 'rgba(34, 197, 94, 0.1)' : 'rgba(217, 119, 6, 0.15)';
+      return { label: 'YOU: RECEIVER', action, color, bg };
+    }
+
+    if (shipment.sender.toLowerCase() === lowerAccount) {
+      return { label: 'YOU: SENDER', action: 'ORIGINATOR', color: 'var(--steel)', bg: 'rgba(0,0,0,0.05)' };
+    }
+
     return null;
   };
 
-  const role = getRole();
+  const roleInfo = getRoleInfo();
   const statusColor = getStatusColor(shipment.status);
   const statusText = getStatusText(shipment.status);
 
@@ -37,12 +57,27 @@ const ShipmentCard = ({ shipment }) => {
     >
       <td style={{ padding: '16px' }}>
         <span className="font-mono font-bold">{formatSequenceNumber(shipment.id)}</span>
-        {role && (
-          <div className="text-xs text-steel font-mono mt-1">{role}</div>
-        )}
       </td>
-      <td style={{ padding: '16px', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {shipment.description}
+      <td style={{ padding: '16px', maxWidth: '220px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontWeight: 'bold' }}>{shipment.description}</div>
+        {roleInfo && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+            <span style={{ 
+              fontSize: '10px', 
+              fontFamily: 'var(--font-mono)', 
+              fontWeight: 'bold', 
+              color: roleInfo.color,
+              background: roleInfo.bg,
+              border: `1px solid ${roleInfo.color}`,
+              padding: '1px 6px'
+            }}>
+              {roleInfo.label}
+            </span>
+            <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
+              [{roleInfo.action}]
+            </span>
+          </div>
+        )}
       </td>
       <td style={{ padding: '16px' }}>
         <span className={`status-text ${statusColor}`}>{statusText}</span>

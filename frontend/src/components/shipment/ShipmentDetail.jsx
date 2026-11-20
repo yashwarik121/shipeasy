@@ -144,12 +144,19 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
   const currentStatusColor = getStatusColor(shipment.status);
   const isDelivered = Number(shipment.status) === 3;
 
-  const isSenderOrReceiver = (account && (
-    shipment.sender.toLowerCase() === account.toLowerCase() || 
-    shipment.receiver.toLowerCase() === account.toLowerCase()
-  )) || (readOnly && keyValidated);
+  const lowerAccount = account ? account.toLowerCase() : '';
+  const isCarrier = !!(lowerAccount && shipment.carrier?.toLowerCase() === lowerAccount);
+  const isReceiver = !!((lowerAccount && shipment.receiver?.toLowerCase() === lowerAccount) || (readOnly && keyValidated));
+  const isSender = !!(lowerAccount && shipment.sender?.toLowerCase() === lowerAccount);
+  const isSenderOrReceiver = isSender || isReceiver;
 
-  const isReceiver = (account && shipment.receiver.toLowerCase() === account.toLowerCase()) || (readOnly && keyValidated);
+  // Auto-validate documents and reveal OTP if logged in as authorized party
+  useEffect(() => {
+    if (isReceiver || isSender) {
+      setKeyValidated(true);
+      setKeyMsg('✓ IDENTIFIED AS AUTHORIZED PARTY — FULL RECORD UNLOCKED');
+    }
+  }, [isReceiver, isSender]);
 
   const fetchReceiverOtp = async () => {
     try {
@@ -180,6 +187,12 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
       setOtpLoading(false);
     }
   };
+
+  useEffect(() => {
+    if ((isReceiver || isSender) && shipment?.id !== undefined && !deliveryOtp) {
+      fetchReceiverOtp();
+    }
+  }, [isReceiver, isSender, shipment?.id]);
 
   const handleCompleteDeliveryWithOtp = async () => {
     if (!carrierOtpInput || carrierOtpInput.length !== 6) {
@@ -264,6 +277,70 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
       </div>
 
       <div style={{ borderBottom: '3px solid var(--ink)', margin: '0 -32px 32px -32px' }}></div>
+
+      {/* DYNAMIC ROLE & ACTIVE IDENTITY BANNER */}
+      <div style={{
+        padding: '16px 20px',
+        marginBottom: '28px',
+        border: '2px solid var(--ink)',
+        background: isCarrier 
+          ? 'rgba(217, 119, 6, 0.08)' 
+          : isReceiver 
+            ? 'rgba(34, 197, 94, 0.08)' 
+            : isSender 
+              ? 'rgba(37, 99, 235, 0.08)' 
+              : 'var(--paper)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: '12px'
+      }}>
+        <div>
+          <div style={{ 
+            fontSize: '11px', 
+            letterSpacing: '1.5px', 
+            textTransform: 'uppercase', 
+            fontWeight: 'bold', 
+            fontFamily: 'var(--font-mono)',
+            color: isCarrier ? 'var(--amber)' : isReceiver ? 'var(--verified-green)' : isSender ? '#2563eb' : 'var(--steel)'
+          }}>
+            ● ACTIVE IDENTITY ROLE
+          </div>
+          <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+            {isCarrier && '🚚 YOU ARE THE ASSIGNED CARRIER'}
+            {isReceiver && '📥 YOU ARE THE DESIGNATED RECEIVER'}
+            {isSender && '📤 YOU ARE THE ORIGINATING SENDER'}
+            {!isCarrier && !isReceiver && !isSender && '👁 YOU ARE VIEWING AS OBSERVER'}
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--steel)', fontFamily: 'var(--font-mono)', marginTop: '2px' }}>
+            Account: {account || 'Not Connected (Read-Only)'}
+          </div>
+        </div>
+
+        <div style={{ 
+          border: '2px solid var(--ink)', 
+          padding: '8px 16px', 
+          background: isCarrier && Number(shipment.status) === 2 ? 'var(--seal-red)' : 'var(--ink)', 
+          color: 'white', 
+          fontFamily: 'var(--font-mono)', 
+          fontSize: '12px', 
+          fontWeight: 'bold',
+          letterSpacing: '0.5px'
+        }}>
+          {isCarrier && (
+            Number(shipment.status) === 0 ? '⚡ ACTION: PICK UP PACKAGE' :
+            Number(shipment.status) === 1 ? '⚡ ACTION: MARK IN TRANSIT' :
+            Number(shipment.status) === 2 ? '⚡ ACTION: ENTER RECEIVER OTP' :
+            '✓ TRANSIT COMPLETED'
+          )}
+          {isReceiver && (
+            Number(shipment.status) === 3 ? '✓ DELIVERED & CONFIRMED' : '🔑 YOUR DELIVERY OTP IS READY BELOW'
+          )}
+          {isSender && 'ORIGINATED ON-CHAIN'}
+          {!isCarrier && !isReceiver && !isSender && 'PUBLIC AUDIT TRAIL'}
+        </div>
+      </div>
 
       {/* DEDICATED CARRIER WAYBILL & ROUTE MILESTONES */}
       <WaybillRoute shipment={shipment} history={history} />
