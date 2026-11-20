@@ -1,4 +1,5 @@
 const express = require('express');
+const { ethers } = require('ethers');
 const router = express.Router();
 
 router.get('/health', async (req, res) => {
@@ -148,6 +149,36 @@ router.get('/events', (req, res) => {
     res.json(events);
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/faucet', async (req, res) => {
+  try {
+    const { address } = req.body;
+    if (!address || !ethers.isAddress(address)) {
+      return res.status(400).json({ error: 'Valid Ethereum address required' });
+    }
+
+    const { blockchain } = req.app.locals;
+    const funderPrivateKey = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
+    const funderWallet = new ethers.Wallet(funderPrivateKey, blockchain.provider);
+
+    const tx = await funderWallet.sendTransaction({
+      to: address,
+      value: ethers.parseEther('100.0')
+    });
+    await tx.wait();
+
+    const newBalance = await blockchain.provider.getBalance(address);
+    res.json({
+      success: true,
+      amount: '100.0 ETH',
+      txHash: tx.hash,
+      newBalance: ethers.formatEther(newBalance)
+    });
+  } catch (error) {
+    console.error('Faucet error:', error);
+    res.status(500).json({ error: error.message || 'Faucet funding failed' });
   }
 });
 

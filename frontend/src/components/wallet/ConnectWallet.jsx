@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useWallet } from '../../context/WalletContext';
 import { truncateAddress } from '../../utils/format';
+import { API_BASE_URL } from '../../utils/api';
 
 const ConnectWallet = () => {
   const { 
@@ -51,6 +52,29 @@ const ConnectWallet = () => {
   const handleCopyAddress = (addr) => {
     navigator.clipboard?.writeText(addr);
     alert(`Copied address: ${addr}`);
+  };
+
+  const [faucetLoading, setFaucetLoading] = useState(false);
+  const [faucetMsg, setFaucetMsg] = useState('');
+
+  const handleClaimTestEth = async () => {
+    if (!account) return;
+    setFaucetLoading(true);
+    setFaucetMsg('');
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/faucet`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address: account })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Faucet request failed');
+      setFaucetMsg(`✓ 100 ETH sent! Balance: ${Number(data.newBalance).toFixed(2)} ETH`);
+    } catch (err) {
+      setFaucetMsg(`Error: ${err.message}`);
+    } finally {
+      setFaucetLoading(false);
+    }
   };
 
   // DISCONNECTED STATE
@@ -370,7 +394,37 @@ const ConnectWallet = () => {
                   SWITCH NETWORK
                 </button>
               )}
+              {isMetaMask && (
+                <button
+                  onClick={handleClaimTestEth}
+                  disabled={faucetLoading}
+                  style={{
+                    background: '#0284c7',
+                    color: 'white',
+                    border: '1px solid var(--ink)',
+                    padding: '3px 8px',
+                    fontSize: '10px',
+                    fontFamily: 'var(--font-mono)',
+                    cursor: faucetLoading ? 'wait' : 'pointer',
+                    fontWeight: 'bold'
+                  }}
+                  title="Claim 100 free test ETH from the local genesis fund"
+                >
+                  {faucetLoading ? 'SENDING ETH...' : '💧 GET 100 TEST ETH'}
+                </button>
+              )}
             </div>
+            {faucetMsg && (
+              <div style={{
+                marginTop: '6px',
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono)',
+                color: faucetMsg.startsWith('✓') ? 'var(--verified-green)' : 'var(--seal-red)',
+                fontWeight: 'bold'
+              }}>
+                {faucetMsg}
+              </div>
+            )}
           </div>
 
           {/* Switch to MetaMask if currently on dev */}
