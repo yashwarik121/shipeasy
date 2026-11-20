@@ -1,0 +1,55 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "1. Start Local Blockchain",
+      "type": "shell",
+      "command": "ganache --wallet.mnemonic \"test test test test test test test test test test test junk\" --wallet.defaultBalance 10000 --chain.chainId 31337 --database.dbPath \"ganache_db\" --server.port 8545",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "group": "shipeasy",
+        "panel": "new",
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "2. Start Backend API",
+      "type": "shell",
+      "command": "cd backend && node src/server.js",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "group": "shipeasy",
+        "panel": "new",
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "3. Start Frontend UI",
+      "type": "shell",
+      "command": "cd frontend && npx vite --host",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "group": "shipeasy",
+        "panel": "new",
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "Start All Services (Ship.Eazy)",
+      "dependsOn": [
+        "1. Start Local Blockchain",
+        "2. Start Backend API",
+        "3. Start Frontend UI"
+      ],
+      "dependsOrder": "parallel",
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
