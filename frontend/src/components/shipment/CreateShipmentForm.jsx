@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { keccak256, toUtf8Bytes } from 'ethers';
 import { useWallet } from '../../context/WalletContext';
 import { useContract } from '../../hooks/useContract';
 
@@ -14,7 +15,7 @@ const CreateShipmentForm = () => {
   const [progress, setProgress] = useState([]);
   
   const { account } = useWallet();
-  const { createShipment, addDocument } = useContract();
+  const { createShipmentWithOtp, addDocument } = useContract();
   const navigate = useNavigate();
 
   const validateAddress = (addr) => {
@@ -57,8 +58,11 @@ const CreateShipmentForm = () => {
     setLoading(true);
 
     try {
-      setProgress(p => [...p, 'CREATING SHIPMENT ON-CHAIN...']);
-      const receipt = await createShipment(carrier, receiver, description);
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpHash = keccak256(toUtf8Bytes(generatedOtp));
+
+      setProgress(p => [...p, 'GENERATING PROOF-OF-DELIVERY OTP...', 'CREATING SHIPMENT ON-CHAIN...']);
+      const receipt = await createShipmentWithOtp(carrier, receiver, description, otpHash, generatedOtp);
       
       // Extract the exact created shipment ID from the transaction receipt logs
       let shipmentId = null;
@@ -84,6 +88,18 @@ const CreateShipmentForm = () => {
           shipmentId = data.length; // The new one is at the current count
         } catch (err) {
           console.error('Failed to retrieve shipment ID', err);
+        }
+      }
+
+      if (shipmentId !== null) {
+        try {
+          await fetch(`http://localhost:3001/api/shipments/${shipmentId}/otp`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp: generatedOtp })
+          });
+        } catch (err) {
+          console.warn('Could not post OTP to backend', err);
         }
       }
 
@@ -127,12 +143,14 @@ const CreateShipmentForm = () => {
 
       setSuccess({
         blockNumber: receipt.blockNumber,
-        txHash: receipt.hash
+        txHash: receipt.hash,
+        otp: generatedOtp,
+        shipmentId
       });
 
       setTimeout(() => {
         navigate('/dashboard');
-      }, 2000);
+      }, 3500);
       
     } catch (err) {
       console.error(err);
@@ -278,6 +296,13 @@ const CreateShipmentForm = () => {
               <div className="text-green font-mono font-bold mb-2">CONFIRMED ON-CHAIN</div>
               <div className="text-green font-mono text-xs">BLOCK #{success.blockNumber}</div>
               <div className="text-green font-mono text-xs">TX: {success.txHash ? success.txHash.substring(0, 16) + '...' : ''}</div>
+              {success.otp && (
+                <div style={{ marginTop: '12px', padding: '12px', background: 'var(--ink)', color: 'white', border: '2px solid var(--verified-green)' }}>
+                  <div style={{ fontSize: '11px', letterSpacing: '1px', textTransform: 'uppercase', color: '#ccc' }}>RECEIVER DELIVERY OTP</div>
+                  <div style={{ fontSize: '28px', letterSpacing: '6px', fontWeight: 'bold', color: 'var(--amber)', margin: '6px 0' }}>{success.otp}</div>
+                  <div style={{ fontSize: '11px', color: '#aaa' }}>Cryptographic Proof-of-Delivery hash stored on-chain.</div>
+                </div>
+              )}
             </div>
           )}
         </div>

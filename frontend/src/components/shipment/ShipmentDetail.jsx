@@ -3,10 +3,11 @@ import { getExplorerAddressUrl, getStatusColor, getStatusText, formatTimestamp }
 import { useWallet } from '../../context/WalletContext';
 import { useContract } from '../../hooks/useContract';
 import CustodyEntry from './StatusTimeline';
+import WaybillRoute from './WaybillRoute';
 
 const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey = '' }) => {
   const { account } = useWallet();
-  const { advanceStatus, getAccessKey } = useContract();
+  const { advanceStatus, completeDeliveryWithOtp, getAccessKey, getDeliveryOtp } = useContract();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
@@ -18,6 +19,11 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
   const [enteredKey, setEnteredKey] = useState(initialAccessKey || '');
   const [keyValidated, setKeyValidated] = useState(!!initialAccessKey);
   const [keyMsg, setKeyMsg] = useState(initialAccessKey ? '✓ ACCESS KEY VERIFIED — DOCUMENTS UNLOCKED' : '');
+
+  const [carrierOtpInput, setCarrierOtpInput] = useState('');
+  const [deliveryOtp, setDeliveryOtp] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState('');
 
   useEffect(() => {
     if (shipment && shipment.id != null) {
@@ -144,6 +150,59 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
 
   const isReceiver = (account && shipment.receiver.toLowerCase() === account.toLowerCase()) || (readOnly && keyValidated);
 
+  const fetchReceiverOtp = async () => {
+    try {
+      setOtpLoading(true);
+      setOtpError('');
+      let otp = null;
+      try {
+        otp = await getDeliveryOtp(shipment.id);
+      } catch (e) {}
+
+      if (!otp) {
+        const addrParam = account || shipment.receiver;
+        const res = await fetch(`http://localhost:3001/api/shipments/${shipment.id}/otp?address=${addrParam}&accessKey=${enteredKey.trim()}`);
+        if (res.ok) {
+          const data = await res.json();
+          otp = data.otp;
+        }
+      }
+
+      if (otp) {
+        setDeliveryOtp(otp);
+      } else {
+        setOtpError('Delivery OTP is restricted to authorized receiver');
+      }
+    } catch (err) {
+      setOtpError('Failed to retrieve delivery OTP');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleCompleteDeliveryWithOtp = async () => {
+    if (!carrierOtpInput || carrierOtpInput.length !== 6) {
+      setError('Please enter a valid 6-digit receiver delivery OTP');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const receipt = await completeDeliveryWithOtp(shipment.id, carrierOtpInput);
+      setSuccess({
+        blockNumber: receipt.blockNumber,
+        txHash: receipt.hash
+      });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } catch (err) {
+      setError(err.reason || err.message || 'OTP verification failed. Invalid code or rejected by smart contract.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAdvanceStatus = async () => {
     if (!account) return;
     setLoading(true);
@@ -155,6 +214,9 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
         blockNumber: receipt.blockNumber,
         txHash: receipt.hash
       });
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
     } catch (err) {
       setError(err.reason || err.message || 'Failed to update status');
     }
@@ -167,7 +229,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
     const status = Number(shipment.status);
     if (status === 0 && shipment.carrier.toLowerCase() === lowerAccount) return true;
     if (status === 1 && shipment.carrier.toLowerCase() === lowerAccount) return true;
-    if (status === 2 && shipment.receiver.toLowerCase() === lowerAccount) return true;
+    if (status === 2 && shipment.carrier.toLowerCase() === lowerAccount) return true; // Carrier delivers with OTP!
     return false;
   };
 
@@ -175,7 +237,7 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
     const status = Number(shipment.status);
     if (status === 0) return 'PICK UP';
     if (status === 1) return 'MARK IN TRANSIT';
-    if (status === 2) return 'CONFIRM DELIVERY';
+    if (status === 2) return 'COMPLETE DELIVERY (OTP REQUIRED)';
     return '';
   };
 
@@ -201,6 +263,9 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
       </div>
 
       <div style={{ borderBottom: '3px solid var(--ink)', margin: '0 -32px 32px -32px' }}></div>
+
+      {/* DEDICATED CARRIER WAYBILL & ROUTE MILESTONES */}
+      <WaybillRoute shipment={shipment} history={history} />
 
       {/* Metadata Rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
@@ -373,20 +438,92 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
         </>
       )}
 
+      {/* PROOF-OF-DELIVERY OTP (RECEIVER / SENDER ONLY) */}
+      {isSenderOrReceiver && (
+        <>
+          <div style={{ borderBottom: '4px solid var(--ink)', margin: '32px -32px 32px -32px' }}></div>
+          <div style={{ border: '3px solid var(--ink)', background: 'var(--ink)', color: 'white', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <div style={{ fontSize: '11px', letterSpacing: '2px', textTransform: 'uppercase', color: 'var(--amber)', fontWeight: 'bold' }}>
+                  PROOF-OF-DELIVERY HANDSHAKE
+                </div>
+                <h2 className="display-sm" style={{ margin: '4px 0 0 0', color: 'white' }}>RECEIVER DELIVERY OTP</h2>
+              </div>
+              {deliveryOtp ? (
+                <div style={{ border: '2px solid var(--amber)', padding: '8px 24px', background: '#000', color: 'var(--amber)', fontSize: '32px', letterSpacing: '8px', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
+                  {deliveryOtp}
+                </div>
+              ) : (
+                <button 
+                  className="btn font-mono" 
+                  onClick={fetchReceiverOtp}
+                  disabled={otpLoading}
+                  style={{ border: '2px solid var(--amber)', color: 'var(--amber)', background: 'transparent', padding: '12px 24px', cursor: 'pointer' }}
+                >
+                  {otpLoading ? 'RETRIEVING FROM CHAIN...' : 'REVEAL DELIVERY OTP'}
+                </button>
+              )}
+            </div>
+            {otpError && <div className="text-red font-mono text-xs mt-2">{otpError}</div>}
+            <p className="font-mono text-xs" style={{ margin: '14px 0 0 0', color: '#ccc', lineHeight: '1.4' }}>
+              ⚠ Physical Handshake: Share this 6-digit code with the carrier ONLY after you receive the package and inspect documents. The carrier cannot mark the shipment as DELIVERED without this exact OTP.
+            </p>
+          </div>
+        </>
+      )}
+
       {/* ACTION SECTION */}
       {canAdvance() && (
         <div style={{ marginTop: '32px', padding: '24px', border: '2px dashed var(--ink)' }}>
           {error && <div className="text-red font-mono mb-4">[ERROR] {error}</div>}
           <div className={success ? 'animate-stamp-flash' : ''}>
             {!success ? (
-              <button 
-                className="btn btn-primary" 
-                style={{ width: '100%', padding: '16px' }}
-                onClick={handleAdvanceStatus}
-                disabled={loading}
-              >
-                {loading ? 'SUBMITTING...' : `ADVANCE TO ${getNextStatusText()}`}
-              </button>
+              Number(shipment.status) === 2 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ borderLeft: '4px solid var(--amber)', paddingLeft: '12px' }}>
+                    <div className="font-mono font-bold text-sm">CARRIER DELIVERY VERIFICATION</div>
+                    <div className="font-mono text-xs text-steel">Request the 6-digit OTP from the receiver upon physical handover</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                    <input 
+                      type="text"
+                      maxLength={6}
+                      placeholder="ENTER 6-DIGIT OTP"
+                      value={carrierOtpInput}
+                      onChange={(e) => setCarrierOtpInput(e.target.value.replace(/\D/g, ''))}
+                      style={{
+                        flex: 1,
+                        minWidth: '200px',
+                        padding: '14px',
+                        fontSize: '22px',
+                        letterSpacing: '6px',
+                        textAlign: 'center',
+                        fontFamily: 'var(--font-mono)',
+                        border: '2px solid var(--ink)',
+                        background: 'var(--paper)'
+                      }}
+                    />
+                    <button 
+                      className="btn btn-primary"
+                      style={{ padding: '14px 24px', minWidth: '220px' }}
+                      onClick={handleCompleteDeliveryWithOtp}
+                      disabled={loading || carrierOtpInput.length !== 6}
+                    >
+                      {loading ? 'VERIFYING...' : 'CONFIRM DELIVERY'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  className="btn btn-primary" 
+                  style={{ width: '100%', padding: '16px' }}
+                  onClick={handleAdvanceStatus}
+                  disabled={loading}
+                >
+                  {loading ? 'SUBMITTING...' : `ADVANCE TO ${getNextStatusText()}`}
+                </button>
+              )
             ) : (
               <div className="stamp animate-stamp" style={{ border: '2px solid var(--verified-green)', padding: '16px', textAlign: 'center' }}>
                 <div className="text-green font-mono font-bold mb-2">STATUS UPDATED ON-CHAIN</div>

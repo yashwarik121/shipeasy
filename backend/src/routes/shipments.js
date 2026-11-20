@@ -63,6 +63,59 @@ router.get('/shipments/:id', async (req, res) => {
   }
 });
 
+router.post('/shipments/:id/otp', (req, res) => {
+  try {
+    const { cache } = req.app.locals;
+    const id = parseInt(req.params.id, 10);
+    const { otp } = req.body;
+    if (isNaN(id) || !otp) return res.status(400).json({ error: "Shipment ID and otp are required" });
+    
+    cache.saveDeliveryOtp(id, String(otp));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/shipments/:id/otp', async (req, res) => {
+  try {
+    const { cache, blockchain } = req.app.locals;
+    const id = parseInt(req.params.id, 10);
+    const { address, accessKey } = req.query;
+    
+    if (isNaN(id)) return res.status(400).json({ error: "Invalid shipment ID" });
+
+    let shipment = cache.getShipment(id);
+    if (!shipment && blockchain.contract) {
+      try {
+        shipment = await blockchain.getShipment(id);
+        const history = await blockchain.getHistory(id);
+        cache.syncShipmentFromChain(id, shipment, history);
+        shipment = cache.getShipment(id);
+      } catch (e) {}
+    }
+
+    if (!shipment) return res.status(404).json({ error: "Shipment not found" });
+
+    const addrLower = (address || '').toLowerCase();
+    const isAuthorized = 
+      (address && (shipment.receiver.toLowerCase() === addrLower || shipment.sender.toLowerCase() === addrLower)) ||
+      (accessKey && shipment.accessKey === accessKey);
+
+    if (!isAuthorized) {
+      return res.status(403).json({ error: "Only receiver or sender can view the delivery OTP" });
+    }
+
+    res.json({
+      shipmentId: id,
+      otp: shipment.deliveryOtp || null,
+      otpHash: shipment.otpHash || null
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/shipments/:id/history', async (req, res) => {
   try {
     const { cache, blockchain } = req.app.locals;

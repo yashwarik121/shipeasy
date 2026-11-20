@@ -30,8 +30,9 @@ class BlockchainService {
       description: raw[4] ?? raw.description,
       status: Number(raw[5] ?? raw.status),
       accessKey: raw[6] ?? raw.accessKey,
-      createdAt: Number(raw[7] ?? raw.createdAt),
-      lastUpdated: Number(raw[8] ?? raw.lastUpdated)
+      otpHash: raw[7] ?? raw.otpHash,
+      createdAt: Number(raw[8] ?? raw.createdAt),
+      lastUpdated: Number(raw[9] ?? raw.lastUpdated)
     };
   }
 

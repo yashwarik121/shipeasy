@@ -44,11 +44,20 @@ async function startServer() {
         }
       });
       
-      const count = await blockchain.getShipmentCount();
-      for (let i = 0; i < count; i++) {
-        const shipment = await blockchain.getShipment(i);
-        const history = await blockchain.getHistory(i);
-        cache.syncShipmentFromChain(i, shipment, history);
+      try {
+        const count = await blockchain.getShipmentCount();
+        for (let i = 0; i < count; i++) {
+          try {
+            const shipment = await blockchain.getShipment(i);
+            const history = await blockchain.getHistory(i);
+            cache.syncShipmentFromChain(i, shipment, history);
+          } catch (syncErr) {
+            console.warn(`Could not sync shipment ${i} from chain:`, syncErr.message);
+          }
+        }
+        console.log(`Successfully synced ${count} shipments from blockchain.`);
+      } catch (countErr) {
+        console.warn("Could not query blockchain on startup:", countErr.message);
       }
     } else {
       console.warn("No contract address configured, skipping blockchain sync.");

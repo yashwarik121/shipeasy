@@ -29,95 +29,101 @@ const Header = () => {
 
   return (
     <header style={{
+      position: 'sticky',
+      top: 0,
+      zIndex: 1000,
       background: 'var(--paper)',
       borderBottom: '3px solid var(--ink)',
       padding: '16px 24px',
-      display: 'flex',
-      justifyContent: 'space-between',
+      display: 'grid',
+      gridTemplateColumns: '1fr auto 1fr',
       alignItems: 'center'
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+      {/* LEFT: Navigation Links */}
+      <nav style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+        <Link 
+          to="/dashboard" 
+          style={{ 
+            textDecoration: 'none', 
+            color: 'var(--ink)',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            borderBottom: isActive('/dashboard') ? '3px solid var(--ink)' : '3px solid transparent',
+            paddingBottom: '4px'
+          }}
+        >
+          DASHBOARD
+        </Link>
+        <Link 
+          to="/create" 
+          style={{ 
+            textDecoration: 'none', 
+            color: 'var(--ink)',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            borderBottom: isActive('/create') ? '3px solid var(--ink)' : '3px solid transparent',
+            paddingBottom: '4px'
+          }}
+        >
+          NEW TRANSFER
+        </Link>
+        <Link 
+          to="/verify" 
+          style={{ 
+            textDecoration: 'none', 
+            color: 'var(--ink)',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            borderBottom: isActive('/verify') ? '3px solid var(--ink)' : '3px solid transparent',
+            paddingBottom: '4px'
+          }}
+        >
+          VERIFY
+        </Link>
+        <Link 
+          to="/tamper-lab" 
+          style={{ 
+            textDecoration: 'none', 
+            color: tamperAlert ? 'var(--seal-red)' : 'var(--stamp-blue)',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            borderBottom: isActive('/tamper-lab') ? `3px solid ${tamperAlert ? 'var(--seal-red)' : 'var(--stamp-blue)'}` : '3px solid transparent',
+            paddingBottom: '4px'
+          }}
+        >
+          <span>{tamperAlert ? '🚨' : '🧪'} TAMPER LAB</span>
+          {tamperAlert && (
+            <span style={{
+              background: 'var(--seal-red)',
+              color: '#fff',
+              fontSize: '10px',
+              padding: '2px 6px',
+              lineHeight: 1
+            }}>
+              ALERT
+            </span>
+          )}
+        </Link>
+      </nav>
+
+      {/* MIDDLE: SHIP.EAZY Logo */}
+      <div style={{ textAlign: 'center' }}>
         <Link to="/" style={{ textDecoration: 'none', color: 'var(--ink)' }}>
-          <span className="display-md uppercase" style={{ margin: 0, letterSpacing: '-0.02em' }}>
+          <span className="display-md uppercase" style={{ margin: 0, letterSpacing: '-0.02em', fontSize: '1.4rem' }}>
             SHIP.EAZY
           </span>
         </Link>
-        
-        <nav style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
-          <Link 
-            to="/dashboard" 
-            style={{ 
-              textDecoration: 'none', 
-              color: 'var(--ink)',
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              borderBottom: isActive('/dashboard') ? '3px solid var(--ink)' : '3px solid transparent',
-              paddingBottom: '4px'
-            }}
-          >
-            DASHBOARD
-          </Link>
-          <Link 
-            to="/create" 
-            style={{ 
-              textDecoration: 'none', 
-              color: 'var(--ink)',
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              borderBottom: isActive('/create') ? '3px solid var(--ink)' : '3px solid transparent',
-              paddingBottom: '4px'
-            }}
-          >
-            NEW TRANSFER
-          </Link>
-          <Link 
-            to="/verify" 
-            style={{ 
-              textDecoration: 'none', 
-              color: 'var(--ink)',
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              borderBottom: isActive('/verify') ? '3px solid var(--ink)' : '3px solid transparent',
-              paddingBottom: '4px'
-            }}
-          >
-            VERIFY
-          </Link>
-          <Link 
-            to="/tamper-lab" 
-            style={{ 
-              textDecoration: 'none', 
-              color: tamperAlert ? 'var(--seal-red)' : 'var(--stamp-blue)',
-              fontFamily: 'var(--font-mono)',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              borderBottom: isActive('/tamper-lab') ? `3px solid ${tamperAlert ? 'var(--seal-red)' : 'var(--stamp-blue)'}` : '3px solid transparent',
-              paddingBottom: '4px'
-            }}
-          >
-            <span>{tamperAlert ? '🚨' : '🧪'} TAMPER LAB</span>
-            {tamperAlert && (
-              <span style={{
-                background: 'var(--seal-red)',
-                color: '#fff',
-                fontSize: '10px',
-                padding: '2px 6px',
-                lineHeight: 1
-              }}>
-                ALERT
-              </span>
-            )}
-          </Link>
-        </nav>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+      {/* RIGHT: Theme Toggle & Connect Wallet */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', justifyContent: 'flex-end' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '12px', color: 'var(--ink)' }}>☀</span>
           <button 

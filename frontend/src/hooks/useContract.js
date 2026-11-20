@@ -22,7 +22,7 @@ export const useContract = () => {
     setLoading(true);
     setError(null);
     try {
-      const tx = await contract.createShipment(carrier, receiver, description);
+      const tx = await contract.createShipment(carrier, receiver, description, { gasLimit: 500000 });
       const receipt = await tx.wait();
       setLoading(false);
       return receipt;
@@ -33,12 +33,28 @@ export const useContract = () => {
     }
   }, [contract, signer]);
 
+  const createShipmentWithOtp = useCallback(async (carrier, receiver, description, otpHash, otp) => {
+    if (!contract || !signer) throw new Error("Contract or signer not available");
+    setLoading(true);
+    setError(null);
+    try {
+      const tx = await contract.createShipmentWithOtp(carrier, receiver, description, otpHash, otp, { gasLimit: 500000 });
+      const receipt = await tx.wait();
+      setLoading(false);
+      return receipt;
+    } catch (err) {
+      setError(err.message || 'Failed to create shipment with OTP');
+      setLoading(false);
+      throw err;
+    }
+  }, [contract, signer]);
+
   const advanceStatus = useCallback(async (id, nextStatus) => {
     if (!contract || !signer) throw new Error("Contract or signer not available");
     setLoading(true);
     setError(null);
     try {
-      const tx = await contract.advanceStatus(id, nextStatus);
+      const tx = await contract.advanceStatus(id, nextStatus, { gasLimit: 200000 });
       const receipt = await tx.wait();
       setLoading(false);
       return receipt;
@@ -49,20 +65,46 @@ export const useContract = () => {
     }
   }, [contract, signer]);
 
+  const completeDeliveryWithOtp = useCallback(async (id, otp) => {
+    if (!contract || !signer) throw new Error("Contract or signer not available");
+    setLoading(true);
+    setError(null);
+    try {
+      const tx = await contract.completeDeliveryWithOtp(id, otp, { gasLimit: 250000 });
+      const receipt = await tx.wait();
+      setLoading(false);
+      return receipt;
+    } catch (err) {
+      setError(err.message || 'Failed to complete delivery with OTP');
+      setLoading(false);
+      throw err;
+    }
+  }, [contract, signer]);
+
+  const getDeliveryOtp = useCallback(async (id) => {
+    if (!contract) throw new Error("Contract not available");
+    try {
+      return await contract.getDeliveryOtp(id);
+    } catch (err) {
+      return null;
+    }
+  }, [contract]);
+
   const getShipment = useCallback(async (id) => {
     if (!contract) throw new Error("Contract not available");
     try {
       const data = await contract.getShipment(id);
       return {
-        id: data[0],
-        sender: data[1],
-        carrier: data[2],
-        receiver: data[3],
-        description: data[4],
-        status: data[5],
-        accessKey: data[6],
-        createdAt: data[7],
-        updatedAt: data[8]
+        id: data[0] ?? data.id,
+        sender: data[1] ?? data.sender,
+        carrier: data[2] ?? data.carrier,
+        receiver: data[3] ?? data.receiver,
+        description: data[4] ?? data.description,
+        status: data[5] ?? data.status,
+        accessKey: data[6] ?? data.accessKey,
+        otpHash: data[7] ?? data.otpHash,
+        createdAt: data[8] ?? data.createdAt,
+        updatedAt: data[9] ?? data.lastUpdated ?? data.updatedAt
       };
     } catch (err) {
       throw err;
@@ -127,7 +169,10 @@ export const useContract = () => {
   return {
     contract,
     createShipment,
+    createShipmentWithOtp,
     advanceStatus,
+    completeDeliveryWithOtp,
+    getDeliveryOtp,
     getShipment,
     getHistory,
     getShipmentCount,

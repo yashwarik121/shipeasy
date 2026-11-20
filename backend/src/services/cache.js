@@ -26,6 +26,14 @@ class CacheService {
 
     const schema = fs.readFileSync(path.join(__dirname, '../db/schema.sql'), 'utf-8');
     this.db.run(schema);
+
+    try {
+      this.db.run('ALTER TABLE shipments ADD COLUMN otp_hash TEXT');
+    } catch (e) {}
+    try {
+      this.db.run('ALTER TABLE shipments ADD COLUMN delivery_otp TEXT');
+    } catch (e) {}
+
     this._save();
   }
 
@@ -36,11 +44,20 @@ class CacheService {
   }
 
   upsertShipment(shipment) {
+    const existing = this.getShipment(shipment.id);
+    const otpHash = shipment.otpHash || (existing ? existing.otpHash : null);
+    const deliveryOtp = shipment.deliveryOtp || (existing ? existing.deliveryOtp : null);
+
     this.db.run(
-      `INSERT OR REPLACE INTO shipments (id, sender, carrier, receiver, description, status, created_at, last_updated, access_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [shipment.id, shipment.sender, shipment.carrier, shipment.receiver, shipment.description, shipment.status, shipment.createdAt, shipment.lastUpdated, shipment.accessKey]
+      `INSERT OR REPLACE INTO shipments (id, sender, carrier, receiver, description, status, created_at, last_updated, access_key, otp_hash, delivery_otp)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [shipment.id, shipment.sender, shipment.carrier, shipment.receiver, shipment.description, shipment.status, shipment.createdAt, shipment.lastUpdated, shipment.accessKey, otpHash, deliveryOtp]
     );
+    this._save();
+  }
+
+  saveDeliveryOtp(id, otp) {
+    this.db.run('UPDATE shipments SET delivery_otp = ? WHERE id = ?', [otp, id]);
     this._save();
   }
 
@@ -130,7 +147,9 @@ class CacheService {
       status: obj.status,
       createdAt: obj.created_at,
       lastUpdated: obj.last_updated,
-      accessKey: obj.access_key
+      accessKey: obj.access_key,
+      otpHash: obj.otp_hash,
+      deliveryOtp: obj.delivery_otp
     };
   }
 
@@ -150,7 +169,9 @@ class CacheService {
         status: obj.status,
         createdAt: obj.created_at,
         lastUpdated: obj.last_updated,
-        accessKey: obj.access_key
+        accessKey: obj.access_key,
+        otpHash: obj.otp_hash,
+        deliveryOtp: obj.delivery_otp
       };
     });
   }
