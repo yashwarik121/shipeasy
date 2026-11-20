@@ -111,19 +111,14 @@ const CreateShipmentForm = () => {
           const file = files[i];
           const hash = await hashFile(file);
           
-          setProgress(p => {
-             const newP = [...p];
-             if (!newP.includes('WRITING HASHES TO CHAIN...')) newP.push('WRITING HASHES TO CHAIN...');
-             return newP;
-          });
+          try {
+            setProgress(p => [...p, `RECORDING ${file.name} HASH ON-CHAIN...`]);
+            await addDocument(shipmentId, hash, file.name);
+          } catch (docChainErr) {
+            console.warn('On-chain addDocument skipped/rejected, proceeding with secure vault upload:', docChainErr);
+          }
           
-          await addDocument(shipmentId, hash, file.name);
-          
-          setProgress(p => {
-             const newP = [...p];
-             if (!newP.includes('UPLOADING FILES...')) newP.push('UPLOADING FILES...');
-             return newP;
-          });
+          setProgress(p => [...p, `UPLOADING ${file.name} TO SECURE VAULT...`]);
 
           const uploaderAddress = account || (selectedAccount && selectedAccount.address) || '';
           const formData = new FormData();
@@ -162,7 +157,7 @@ const CreateShipmentForm = () => {
 
       setTimeout(() => {
         navigate('/dashboard');
-      }, 3500);
+      }, 1200);
       
     } catch (err) {
       console.error(err);

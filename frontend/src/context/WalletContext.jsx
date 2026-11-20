@@ -84,6 +84,7 @@ export const WalletProvider = ({ children }) => {
       }
 
       const browserProvider = new BrowserProvider(window.ethereum);
+      browserProvider.pollingInterval = 800;
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       
       if (!accounts || accounts.length === 0) {
@@ -187,6 +188,7 @@ export const WalletProvider = ({ children }) => {
         setAccount(accounts[0]);
         try {
           const browserProvider = new BrowserProvider(window.ethereum);
+          browserProvider.pollingInterval = 800;
           const newSigner = await browserProvider.getSigner();
           setProvider(browserProvider);
           setSigner(newSigner);

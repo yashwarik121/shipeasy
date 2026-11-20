@@ -218,9 +218,13 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
         blockNumber: receipt.blockNumber,
         txHash: receipt.hash
       });
+      // Sync cache and immediately refresh
+      try {
+        await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}`);
+      } catch (e) {}
       setTimeout(() => {
         window.location.reload();
-      }, 1500);
+      }, 600);
     } catch (err) {
       setError(err.reason || err.message || 'Failed to update status');
     }
@@ -240,9 +244,13 @@ const ShipmentDetail = ({ shipment, history, readOnly = false, initialAccessKey 
         blockNumber: receipt.blockNumber,
         txHash: receipt.hash
       });
+      // Sync cache and immediately refresh
+      try {
+        await fetch(`${API_BASE_URL}/api/shipments/${shipment.id}`);
+      } catch (e) {}
       setTimeout(() => {
         window.location.reload();
-      }, 1500);
+      }, 600);
     } catch (err) {
       setError(err.reason || err.message || 'OTP Verification Failed! Invalid code.');
     }

@@ -3,6 +3,51 @@ import { Contract } from 'ethers';
 import { useWallet } from '../context/WalletContext';
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../utils/contract';
 
+// Fast receipt waiter: races tx.wait(1) with direct RPC receipt polling every 500ms
+// Never hangs in a loop when user approves in MetaMask
+const waitForTxReceipt = async (tx, provider, timeoutMs = 12000) => {
+  if (!tx) return null;
+  
+  const pollPromise = new Promise(async (resolve) => {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (provider && tx.hash) {
+        try {
+          const receipt = await provider.getTransactionReceipt(tx.hash);
+          if (receipt && receipt.blockNumber != null) {
+            resolve(receipt);
+            return;
+          }
+        } catch (e) {}
+      }
+      await new Promise(r => setTimeout(r, 500));
+    }
+    resolve(null);
+  });
+
+  const waitPromise = tx.wait ? tx.wait(1) : Promise.resolve(null);
+
+  try {
+    const result = await Promise.race([waitPromise, pollPromise]);
+    if (result) return result;
+    if (provider && tx.hash) {
+      const receipt = await provider.getTransactionReceipt(tx.hash);
+      if (receipt) return receipt;
+    }
+    return await waitPromise;
+  } catch (err) {
+    if (provider && tx.hash) {
+      try {
+        const receipt = await provider.getTransactionReceipt(tx.hash);
+        if (receipt && Number(receipt.status) === 1) {
+          return receipt;
+        }
+      } catch (e) {}
+    }
+    throw err;
+  }
+};
+
 export const useContract = () => {
   const { provider, signer, isConnected } = useWallet();
   const [loading, setLoading] = useState(false);
@@ -23,7 +68,7 @@ export const useContract = () => {
     setError(null);
     try {
       const tx = await contract.createShipment(carrier, receiver, description, { gasLimit: 500000 });
-      const receipt = await tx.wait();
+      const receipt = await waitForTxReceipt(tx, provider);
       setLoading(false);
       return receipt;
     } catch (err) {
@@ -31,7 +76,7 @@ export const useContract = () => {
       setLoading(false);
       throw err;
     }
-  }, [contract, signer]);
+  }, [contract, signer, provider]);
 
   const createShipmentWithOtp = useCallback(async (carrier, receiver, description, otpHash, otp) => {
     if (!contract || !signer) throw new Error("Contract or signer not available");
@@ -39,7 +84,7 @@ export const useContract = () => {
     setError(null);
     try {
       const tx = await contract.createShipmentWithOtp(carrier, receiver, description, otpHash, otp, { gasLimit: 500000 });
-      const receipt = await tx.wait();
+      const receipt = await waitForTxReceipt(tx, provider);
       setLoading(false);
       return receipt;
     } catch (err) {
@@ -47,7 +92,7 @@ export const useContract = () => {
       setLoading(false);
       throw err;
     }
-  }, [contract, signer]);
+  }, [contract, signer, provider]);
 
   const advanceStatus = useCallback(async (id, nextStatus) => {
     if (!contract || !signer) throw new Error("Contract or signer not available");
@@ -55,7 +100,7 @@ export const useContract = () => {
     setError(null);
     try {
       const tx = await contract.advanceStatus(id, nextStatus, { gasLimit: 200000 });
-      const receipt = await tx.wait();
+      const receipt = await waitForTxReceipt(tx, provider);
       setLoading(false);
       return receipt;
     } catch (err) {
@@ -63,7 +108,7 @@ export const useContract = () => {
       setLoading(false);
       throw err;
     }
-  }, [contract, signer]);
+  }, [contract, signer, provider]);
 
   const completeDeliveryWithOtp = useCallback(async (id, otp) => {
     if (!contract || !signer) throw new Error("Contract or signer not available");
@@ -71,7 +116,7 @@ export const useContract = () => {
     setError(null);
     try {
       const tx = await contract.completeDeliveryWithOtp(id, otp, { gasLimit: 250000 });
-      const receipt = await tx.wait();
+      const receipt = await waitForTxReceipt(tx, provider);
       setLoading(false);
       return receipt;
     } catch (err) {
@@ -79,7 +124,7 @@ export const useContract = () => {
       setLoading(false);
       throw err;
     }
-  }, [contract, signer]);
+  }, [contract, signer, provider]);
 
   const getDeliveryOtp = useCallback(async (id) => {
     if (!contract) throw new Error("Contract not available");
@@ -104,7 +149,7 @@ export const useContract = () => {
         accessKey: data[6] ?? data.accessKey,
         otpHash: data[7] ?? data.otpHash,
         createdAt: data[8] ?? data.createdAt,
-        updatedAt: data[9] ?? data.lastUpdated ?? data.updatedAt
+        lastUpdated: data[9] ?? data.lastUpdated
       };
     } catch (err) {
       throw err;
@@ -115,10 +160,10 @@ export const useContract = () => {
     if (!contract) throw new Error("Contract not available");
     try {
       const data = await contract.getHistory(id);
-      return data.map(item => ({
-        status: item[0],
-        updatedBy: item[1],
-        timestamp: item[2]
+      return data.map(entry => ({
+        status: entry[0] ?? entry.status,
+        updater: entry[1] ?? entry.updater,
+        timestamp: entry[2] ?? entry.timestamp
       }));
     } catch (err) {
       throw err;
@@ -130,34 +175,34 @@ export const useContract = () => {
     try {
       return await contract.getShipmentCount();
     } catch (err) {
-      throw err;
+      return 0n;
     }
   }, [contract]);
 
   const addDocument = useCallback(async (shipmentId, fileHash, fileName) => {
-    if (!contract || !signer) throw new Error('Contract or signer not available');
+    if (!contract || !signer) throw new Error("Contract or signer not available");
     setLoading(true);
     setError(null);
     try {
-        const tx = await contract.addDocument(shipmentId, fileHash, fileName);
-        const receipt = await tx.wait();
-        setLoading(false);
-        return receipt;
+      const tx = await contract.addDocument(shipmentId, fileHash, fileName, { gasLimit: 300000 });
+      const receipt = await waitForTxReceipt(tx, provider);
+      setLoading(false);
+      return receipt;
     } catch (err) {
-        setError(err.message || 'Failed to add document');
-        setLoading(false);
-        throw err;
+      setError(err.message || 'Failed to add document');
+      setLoading(false);
+      throw err;
     }
-  }, [contract, signer]);
+  }, [contract, signer, provider]);
 
   const getDocuments = useCallback(async (shipmentId) => {
     if (!contract) throw new Error('Contract not available');
     const data = await contract.getDocuments(shipmentId);
     return data.map(doc => ({
-        fileHash: doc[0],
-        fileName: doc[1],
-        uploader: doc[2],
-        timestamp: Number(doc[3])
+      fileHash: doc[0],
+      fileName: doc[1],
+      uploader: doc[2],
+      timestamp: Number(doc[3])
     }));
   }, [contract]);
 
