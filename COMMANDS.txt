@@ -1,0 +1,54 @@
+================================================================================
+                       SHIP.EAZY - QUICK RUN COMMANDS
+================================================================================
+
+--- METHOD 1: 1-LINE AUTOMATIC START (RUN THIS IN POWERSHELL / CMD) ---
+.\start.bat
+
+
+--- METHOD 2: COPY-PASTE INTO 3 SEPARATE VS CODE TERMINALS ---
+
+### TERMINAL 1 (BLOCKCHAIN RPC - GANACHE PORT 8545)
+ganache --wallet.mnemonic "test test test test test test test test test test test junk" --wallet.defaultBalance 10000 --chain.chainId 31337 --database.dbPath "ganache_db" --server.port 8545
+
+### TERMINAL 2 (BACKEND EXPRESS API - PORT 3001)
+cd backend; node src/server.js
+
+### TERMINAL 3 (FRONTEND REACT VITE - PORT 5173)
+cd frontend; npx vite --host
+
+
+================================================================================
+                     FIRST-TIME DEPENDENCY INSTALLATION
+================================================================================
+# Run these only once if you haven't installed dependencies yet:
+
+cd contracts; npm install; cd ..
+cd backend; npm install; cd ..
+cd frontend; npm install; cd ..
+
+
+================================================================================
+                    METAMASK CONFIGURATION FOR LOCALHOST
+================================================================================
+Network Name:      Hardhat / Ganache Local
+New RPC URL:       http://127.0.0.1:8545
+Chain ID:          31337
+Currency Symbol:   ETH
+
+Sender Account #0 Private Key:
+0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+
+Carrier Account #1 Private Key:
+0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d
+
+Receiver Account #2 Private Key:
+0x5de4111afa1a4b94908f83103eb1f1706367c2e68ca870fc3fb9a804cdab365a
+
+
+================================================================================
+                               APP URLS
+================================================================================
+Frontend: http://localhost:5173
+Backend:  http://localhost:3001/api/health
+================================================================================
